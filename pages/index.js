@@ -17,10 +17,14 @@ export default function Dashboard() {
   // Instagram Post Generator State
   const [showPostGenerator, setShowPostGenerator] = useState(false)
   const [showQuickPostModal, setShowQuickPostModal] = useState(false)
+  const [showImageGenerator, setShowImageGenerator] = useState(false)
+  const [imagePrompt, setImagePrompt] = useState('')
   const [postPrompt, setPostPrompt] = useState('')
   const [generatedImageUrl, setGeneratedImageUrl] = useState(null)
+  const [generatedBgImage, setGeneratedBgImage] = useState(null)
   const [isGeneratingPrompt, setIsGeneratingPrompt] = useState(false)
   const [isGeneratingImage, setIsGeneratingImage] = useState(false)
+  const [isGeneratingBgImage, setIsGeneratingBgImage] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [etkinlikNews, setEtkinlikNews] = useState([])
 
@@ -128,6 +132,52 @@ ${selectedNews.content_snippet ? `Detay: ${selectedNews.content_snippet}` : ''}
     }
 
     setIsGeneratingPrompt(false)
+  }
+
+  // Sadece arka plan görseli üret (yazı yok)
+  const generateBackgroundImage = async () => {
+    if (!imagePrompt) return
+    setIsGeneratingBgImage(true)
+    setGeneratedBgImage(null)
+
+    try {
+      const response = await fetch('/api/unsplash', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: imagePrompt })
+      })
+
+      const data = await response.json()
+      if (data.imageUrl) {
+        setGeneratedBgImage(data.imageUrl)
+      } else {
+        throw new Error('Görsel bulunamadı')
+      }
+    } catch (error) {
+      console.error('Image generation error:', error)
+      alert('Görsel oluşturulurken hata: ' + error.message)
+    }
+
+    setIsGeneratingBgImage(false)
+  }
+
+  // Görseli indir
+  const downloadImage = async (url, filename = 'gorsel.jpg') => {
+    try {
+      const response = await fetch(url)
+      const blob = await response.blob()
+      const blobUrl = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = blobUrl
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(blobUrl)
+    } catch (error) {
+      // Fallback: open in new tab
+      window.open(url, '_blank')
+    }
   }
 
   // Arka plan görseli al (Gemini veya Unsplash)
@@ -332,16 +382,13 @@ ${selectedNews.content_snippet ? `Detay: ${selectedNews.content_snippet}` : ''}
               </div>
               <div className="flex items-center gap-3">
                 <button
-                  onClick={() => router.push('/template-editor')}
+                  onClick={() => setShowImageGenerator(true)}
                   className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 flex items-center gap-2 font-medium shadow-sm"
                 >
                   🎨 Gorsel Olustur
                 </button>
                 <button
-                  onClick={() => {
-                    setCategoryFilter('ETKINLIK')
-                    setShowQuickPostModal(true)
-                  }}
+                  onClick={() => router.push('/template-editor')}
                   className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 flex items-center gap-2 font-medium shadow-sm"
                 >
                   📸 Post Olustur
@@ -664,88 +711,105 @@ ${selectedNews.content_snippet ? `Detay: ${selectedNews.content_snippet}` : ''}
           </div>
         )}
 
-        {/* Quick Post Modal - Etkinlik haberi seç ve post oluştur */}
-        {showQuickPostModal && (
+        {/* Görsel Oluştur Modal - Sadece arka plan görseli */}
+        {showImageGenerator && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-              <div className="p-6 border-b">
-                <div className="flex items-center justify-between">
+            <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-6">
+                {/* Header */}
+                <div className="flex items-center justify-between mb-6">
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl flex items-center justify-center">
-                      <span className="text-white text-2xl">📸</span>
+                    <div className="w-12 h-12 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center">
+                      <span className="text-white text-2xl">🎨</span>
                     </div>
                     <div>
-                      <h2 className="text-xl font-bold text-gray-900">Post Olustur</h2>
-                      <p className="text-sm text-gray-500">Etkinlik haberi secin ve Instagram postu olusturun</p>
+                      <h2 className="text-xl font-bold text-gray-900">Gorsel Olustur</h2>
+                      <p className="text-sm text-gray-500">Konuya uygun arka plan gorseli uret</p>
                     </div>
                   </div>
                   <button
-                    onClick={() => setShowQuickPostModal(false)}
+                    onClick={() => {
+                      setShowImageGenerator(false)
+                      setImagePrompt('')
+                      setGeneratedBgImage(null)
+                    }}
                     className="text-gray-400 hover:text-gray-600 text-2xl"
                   >
                     ×
                   </button>
                 </div>
-              </div>
 
-              <div className="flex-1 overflow-y-auto p-6">
-                {etkinlikNews.length === 0 ? (
-                  <div className="text-center py-12 text-gray-500">
-                    <p>ETKINLIK kategorisinde haber bulunamadi.</p>
-                  </div>
-                ) : (
-                  <div className="grid gap-4">
-                    {etkinlikNews.map((item) => (
-                      <div
-                        key={item.id}
-                        className="border rounded-xl p-4 hover:border-purple-300 hover:bg-purple-50 cursor-pointer transition-all"
-                        onClick={() => {
-                          setSelectedNews(item)
-                          setShowQuickPostModal(false)
-                          openPostGenerator()
-                        }}
+                {/* Prompt Girişi */}
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Gorsel Konusu
+                  </label>
+                  <input
+                    type="text"
+                    value={imagePrompt}
+                    onChange={(e) => setImagePrompt(e.target.value)}
+                    placeholder="Ornek: festival, party, soccer, concert, city..."
+                    className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    onKeyDown={(e) => e.key === 'Enter' && generateBackgroundImage()}
+                  />
+                  <p className="text-xs text-gray-400 mt-2">
+                    Anahtar kelimeler: soccer, party, concert, festival, city, food, music, event...
+                  </p>
+                </div>
+
+                {/* Üret Butonu */}
+                <button
+                  onClick={generateBackgroundImage}
+                  disabled={!imagePrompt || isGeneratingBgImage}
+                  className="w-full px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mb-6"
+                >
+                  {isGeneratingBgImage ? (
+                    <>Gorsel Araniyor...</>
+                  ) : (
+                    <>Gorsel Bul</>
+                  )}
+                </button>
+
+                {/* Önizleme */}
+                {generatedBgImage && (
+                  <div className="border rounded-xl p-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-3">Onizleme</label>
+                    <div className="relative">
+                      <img
+                        src={generatedBgImage}
+                        alt="Generated Background"
+                        className="w-full rounded-lg shadow-lg"
+                      />
+                    </div>
+
+                    {/* Aksiyon Butonları */}
+                    <div className="flex gap-3 mt-4">
+                      <button
+                        onClick={generateBackgroundImage}
+                        disabled={isGeneratingBgImage}
+                        className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium disabled:opacity-50 flex items-center justify-center gap-2"
                       >
-                        <div className="flex items-start gap-4">
-                          <div className={`w-12 h-12 rounded-lg flex items-center justify-center text-white font-bold flex-shrink-0 ${getScoreColor(item.score)}`}>
-                            {item.score}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className={`px-2 py-0.5 rounded text-xs font-medium ${getStatusBadge(item.status)}`}>
-                                {item.status}
-                              </span>
-                              <span className="text-xs text-gray-400">{item.source}</span>
-                            </div>
-                            <h3 className="font-medium text-gray-900">{item.title_tr || item.title_en}</h3>
-                            {item.content_snippet && (
-                              <p className="text-sm text-gray-500 mt-1 line-clamp-2">{item.content_snippet}</p>
-                            )}
-                          </div>
-                          <button className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg text-sm font-medium flex-shrink-0">
-                            Sec
-                          </button>
-                        </div>
-                      </div>
-                    ))}
+                        Baska Gorsel
+                      </button>
+                      <button
+                        onClick={() => downloadImage(generatedBgImage, `gorsel_${Date.now()}.jpg`)}
+                        className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium flex items-center justify-center gap-2"
+                      >
+                        Indir
+                      </button>
+                      <button
+                        onClick={() => {
+                          // Template editor'a gorseli gonderebiliriz
+                          localStorage.setItem('backgroundImage', generatedBgImage)
+                          router.push('/template-editor')
+                        }}
+                        className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium flex items-center justify-center gap-2"
+                      >
+                        Post Yap
+                      </button>
+                    </div>
                   </div>
                 )}
-              </div>
-
-              <div className="p-4 border-t bg-gray-50">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm text-gray-500">
-                    Veya sifirdan gorsel olusturmak icin:
-                  </p>
-                  <button
-                    onClick={() => {
-                      setShowQuickPostModal(false)
-                      router.push('/template-editor')
-                    }}
-                    className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg text-sm font-medium"
-                  >
-                    Template Editor'u Ac
-                  </button>
-                </div>
               </div>
             </div>
           </div>
