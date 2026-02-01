@@ -1,7 +1,7 @@
 // Imagen 3 via Gemini API - AI Image Generation
 import { createClient } from '@supabase/supabase-js'
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || 'AIzaSyB5w3fvek5gkxhcZIe_5r8XKtgQHKz8Nws'
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
@@ -72,6 +72,11 @@ function generatePrompt(news) {
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
+  }
+
+  // API key kontrolü
+  if (!GEMINI_API_KEY) {
+    return res.status(500).json({ error: 'GEMINI_API_KEY is not configured' })
   }
 
   const { news } = req.body
