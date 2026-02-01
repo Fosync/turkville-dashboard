@@ -12,6 +12,7 @@ export default function Dashboard() {
   const [selectedNews, setSelectedNews] = useState(null)
   const [filter, setFilter] = useState('all')
   const [categoryFilter, setCategoryFilter] = useState('all')
+  const [dateFilter, setDateFilter] = useState('all')
   const [stats, setStats] = useState({ total: 0, high: 0, medium: 0, low: 0 })
 
   // Instagram Post Generator State
@@ -39,7 +40,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchNews()
-  }, [filter, categoryFilter])
+  }, [filter, categoryFilter, dateFilter])
 
   // ETKINLIK haberlerini yükle (Quick Post Modal için)
   useEffect(() => {
@@ -59,15 +60,33 @@ export default function Dashboard() {
 
   const fetchNews = async () => {
     setLoading(true)
-    
-    let query = supabase.from('news_items').select('*').order('score', { ascending: false })
-    
+
+    let query = supabase.from('news_items').select('*').order('created_at', { ascending: false })
+
     if (filter === 'high') query = query.gte('score', 70)
     else if (filter === 'medium') query = query.gte('score', 40).lt('score', 70)
     else if (filter === 'low') query = query.lt('score', 40)
-    
+
     if (categoryFilter !== 'all') query = query.eq('category', categoryFilter)
-    
+
+    // Tarih filtresi
+    if (dateFilter !== 'all') {
+      const now = new Date()
+      let startDate = new Date()
+
+      if (dateFilter === 'today') {
+        startDate.setHours(0, 0, 0, 0)
+      } else if (dateFilter === '3days') {
+        startDate.setDate(now.getDate() - 3)
+      } else if (dateFilter === '1week') {
+        startDate.setDate(now.getDate() - 7)
+      } else if (dateFilter === '1month') {
+        startDate.setMonth(now.getMonth() - 1)
+      }
+
+      query = query.gte('created_at', startDate.toISOString())
+    }
+
     const { data, error } = await query
     
     if (error) {
@@ -577,15 +596,29 @@ ${selectedNews.content_snippet ? `Detay: ${selectedNews.content_snippet}` : ''}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Kategori</label>
-                <select 
-                  value={categoryFilter} 
+                <select
+                  value={categoryFilter}
                   onChange={(e) => setCategoryFilter(e.target.value)}
                   className="px-3 py-2 border rounded-lg bg-white"
                 >
-                  <option value="all">Tüm Kategoriler</option>
+                  <option value="all">Tum Kategoriler</option>
                   {categories.map(cat => (
                     <option key={cat} value={cat}>{getCategoryEmoji(cat)} {cat}</option>
                   ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Tarih</label>
+                <select
+                  value={dateFilter}
+                  onChange={(e) => setDateFilter(e.target.value)}
+                  className="px-3 py-2 border rounded-lg bg-white"
+                >
+                  <option value="all">Tum Zamanlar</option>
+                  <option value="today">Bugun</option>
+                  <option value="3days">Son 3 Gun</option>
+                  <option value="1week">Son 1 Hafta</option>
+                  <option value="1month">Son 1 Ay</option>
                 </select>
               </div>
             </div>
@@ -719,13 +752,15 @@ ${selectedNews.content_snippet ? `Detay: ${selectedNews.content_snippet}` : ''}
                     <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
                       📸 Instagram Icerikleri
                     </h3>
-                    <button
-                      onClick={saveInstagramContent}
-                      disabled={isSavingInstagram}
-                      className="px-3 py-1 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50"
-                    >
-                      {isSavingInstagram ? 'Kaydediliyor...' : 'Kaydet'}
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={saveInstagramContent}
+                        disabled={isSavingInstagram}
+                        className="px-3 py-1 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50"
+                      >
+                        {isSavingInstagram ? 'Kaydediliyor...' : 'Kaydet'}
+                      </button>
+                    </div>
                   </div>
 
                   {/* Slide 1 - Özet */}
@@ -769,19 +804,27 @@ ${selectedNews.content_snippet ? `Detay: ${selectedNews.content_snippet}` : ''}
                       rows={3}
                     />
                   </div>
-                </div>
 
-                {/* ETKINLIK kategorisi için Post Üret butonu */}
-                {selectedNews.category === 'ETKINLIK' && (
-                  <div className="border-t pt-4 mt-4">
+                  {/* Görsel Oluştur ve Post Üret Butonları */}
+                  <div className="flex gap-2 mt-4">
+                    <button
+                      onClick={() => {
+                        const title = selectedNews.title_tr || ''
+                        setImagePrompt(title)
+                        setShowImageGenerator(true)
+                      }}
+                      className="flex-1 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 font-medium text-sm"
+                    >
+                      🎨 Gorsel Olustur
+                    </button>
                     <button
                       onClick={openPostGenerator}
-                      className="w-full px-4 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 font-medium flex items-center justify-center gap-2"
+                      className="flex-1 px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 font-medium text-sm"
                     >
-                      📸 Instagram Post Uret
+                      📸 Post Uret
                     </button>
                   </div>
-                )}
+                </div>
 
                 <div className="border-t pt-4 mt-4">
                   <a
