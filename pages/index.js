@@ -1134,12 +1134,21 @@ ${selectedNews.content_snippet ? `Detay: ${selectedNews.content_snippet}` : ''}
                       <p className="text-sm text-gray-500">2 slide - ayni arka plan, farkli metinler</p>
                     </div>
                   </div>
-                  <button
-                    onClick={() => setShowPostGenerator(false)}
-                    className="text-gray-400 hover:text-gray-600 text-2xl"
-                  >
-                    ×
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <a
+                      href="/template-editor"
+                      target="_blank"
+                      className="px-3 py-1.5 bg-indigo-100 text-indigo-700 rounded-lg text-sm font-medium hover:bg-indigo-200 flex items-center gap-1"
+                    >
+                      🎨 Tasarim Editoru
+                    </a>
+                    <button
+                      onClick={() => setShowPostGenerator(false)}
+                      className="text-gray-400 hover:text-gray-600 text-2xl"
+                    >
+                      ×
+                    </button>
+                  </div>
                 </div>
 
                 {/* Slide Metinleri Önizleme */}
