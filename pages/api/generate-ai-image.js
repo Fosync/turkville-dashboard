@@ -1,74 +1,130 @@
-// Imagen 4 AI Image Generation
+// Imagen 4 AI Image Generation - news_images tablosu ile
 import { createClient } from '@supabase/supabase-js'
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-// Kategori bazlı stil ekleri
-const CATEGORY_STYLES = {
-  'GOCMENLIK': 'passport, airport terminal, immigration documents, Canadian flag, travel',
-  'EKONOMI': 'financial charts, Canadian dollar, business district, stock market, Toronto skyline',
-  'GUNDEM': 'Canadian parliament building, politics, Ottawa, cityscape, government',
-  'HAVA': 'weather scene, dramatic sky, Toronto skyline, Canadian landscape',
-  'GUVENLIK': 'police lights, security, urban safety, Canadian police, emergency',
-  'ETKINLIK': 'community event, celebration, festival, concert, gathering, party',
-  'IS_ILANI': 'modern office, workplace, job interview, professional setting, career',
-  'DENEY': 'laboratory, science, research, innovation, technology',
-  'DIGER': 'Toronto cityscape, Canada landscape, urban, modern'
+// Kategori bazlı sahne tanımları (marka ismi YOK)
+const CATEGORY_SCENES = {
+  'GOCMENLIK': 'diverse group of people in an airport terminal, travel documents, luggage, Canadian maple leaf flag in background',
+  'EKONOMI': 'modern business district skyline, glass buildings, financial district atmosphere, city lights',
+  'GUNDEM': 'government building with classical architecture, urban cityscape, official atmosphere',
+  'HAVA': 'dramatic sky with clouds, city skyline silhouette, weather atmosphere',
+  'GUVENLIK': 'city street at night with blue and red lights reflection, urban safety atmosphere',
+  'ETKINLIK': 'colorful community gathering, festive decorations, people celebrating, warm lighting',
+  'IS_ILANI': 'modern office interior, professional workspace, natural light through windows',
+  'DENEY': 'laboratory equipment, scientific research setting, modern technology',
+  'DIGER': 'modern urban cityscape, clean architecture, professional atmosphere'
 }
 
-// Türkçe-İngilizce çeviri tablosu
-const TRANSLATIONS = {
-  'kanada': 'Canada', 'toronto': 'Toronto', 'türk': 'Turkish', 'türkiye': 'Turkey',
-  'göçmenlik': 'immigration', 'vize': 'visa', 'pasaport': 'passport', 'vatandaşlık': 'citizenship',
-  'ekonomi': 'economy', 'dolar': 'dollar', 'borsa': 'stock market', 'enflasyon': 'inflation',
-  'haber': 'news', 'seçim': 'election', 'hükümet': 'government', 'politika': 'politics',
-  'hava': 'weather', 'kar': 'snow', 'yağmur': 'rain', 'fırtına': 'storm', 'güneş': 'sunny',
-  'polis': 'police', 'güvenlik': 'security', 'acil': 'emergency', 'kaza': 'accident',
-  'etkinlik': 'event', 'festival': 'festival', 'konser': 'concert', 'kutlama': 'celebration',
-  'toplantı': 'meeting', 'parti': 'party', 'topluluk': 'community',
-  'iş': 'job', 'çalışma': 'work', 'kariyer': 'career', 'maaş': 'salary'
+// Marka isimlerini genel tanımlarla değiştir
+const BRAND_REPLACEMENTS = {
+  'cineplex': 'movie theater',
+  'tim hortons': 'coffee shop',
+  'starbucks': 'coffee shop',
+  'mcdonalds': 'fast food restaurant',
+  'burger king': 'fast food restaurant',
+  'wendys': 'fast food restaurant',
+  'subway': 'sandwich shop',
+  'pizza pizza': 'pizza restaurant',
+  'walmart': 'supermarket',
+  'costco': 'warehouse store',
+  'loblaws': 'grocery store',
+  'no frills': 'grocery store',
+  'shoppers drug mart': 'pharmacy',
+  'ikea': 'furniture store',
+  'canadian tire': 'hardware store',
+  'home depot': 'hardware store',
+  'td bank': 'bank building',
+  'td': 'bank building',
+  'rbc': 'bank building',
+  'scotiabank': 'bank building',
+  'bmo': 'bank building',
+  'cibc': 'bank building',
+  'air canada': 'commercial airplane',
+  'westjet': 'commercial airplane',
+  'porter': 'commercial airplane',
+  'uber': 'taxi cab',
+  'lyft': 'taxi cab',
+  'skip the dishes': 'food delivery',
+  'doordash': 'food delivery',
+  'amazon': 'delivery packages',
+  'google': 'technology office',
+  'apple': 'technology store',
+  'microsoft': 'technology office',
+  'facebook': 'social gathering',
+  'meta': 'social gathering',
+  'instagram': 'photography',
+  'twitter': 'communication',
+  'x.com': 'communication',
+  'tiktok': 'entertainment',
+  'youtube': 'video production',
+  'netflix': 'home entertainment',
+  'spotify': 'music listening',
+  'presto': 'transit station',
+  'ttc': 'public transit station',
+  'go train': 'commuter train station',
+  'go transit': 'commuter train station',
+  'via rail': 'train station platform',
+  'rogers': 'telecommunications',
+  'bell': 'telecommunications',
+  'telus': 'telecommunications',
+  'freedom mobile': 'mobile phone'
 }
 
-function translateToEnglish(text) {
+// Metinden marka isimlerini ve sayıları temizle, sahne tanımına dönüştür
+function cleanTextForPrompt(text) {
   if (!text) return ''
-  let result = text.toLowerCase()
+
+  let cleaned = text.toLowerCase()
 
   // Türkçe karakterleri değiştir
-  result = result
+  cleaned = cleaned
     .replace(/ğ/g, 'g').replace(/ü/g, 'u').replace(/ş/g, 's')
     .replace(/ı/g, 'i').replace(/ö/g, 'o').replace(/ç/g, 'c')
-    .replace(/Ğ/g, 'G').replace(/Ü/g, 'U').replace(/Ş/g, 'S')
-    .replace(/İ/g, 'I').replace(/Ö/g, 'O').replace(/Ç/g, 'C')
 
-  // Bilinen kelimeleri çevir
-  for (const [tr, en] of Object.entries(TRANSLATIONS)) {
-    const normalizedTr = tr.replace(/ğ/g, 'g').replace(/ü/g, 'u').replace(/ş/g, 's').replace(/ı/g, 'i').replace(/ö/g, 'o').replace(/ç/g, 'c')
-    const regex = new RegExp(`\\b${normalizedTr}\\b`, 'gi')
-    result = result.replace(regex, en)
+  // Marka isimlerini sahne tanımlarıyla değiştir
+  for (const [brand, replacement] of Object.entries(BRAND_REPLACEMENTS)) {
+    const regex = new RegExp(`\\b${brand}\\b`, 'gi')
+    cleaned = cleaned.replace(regex, replacement)
   }
 
-  return result
+  // Sayıları, fiyatları, yüzdeleri, tarihleri kaldır
+  cleaned = cleaned.replace(/\$?\d+([.,]\d+)?(\s*(%|percent|dolar|cad|tl|euro|million|billion|bin|milyon|milyar))?\b/gi, '')
+  cleaned = cleaned.replace(/\b(january|february|march|april|may|june|july|august|september|october|november|december)\b/gi, '')
+  cleaned = cleaned.replace(/\b(ocak|subat|mart|nisan|mayis|haziran|temmuz|agustos|eylul|ekim|kasim|aralik)\b/gi, '')
+  cleaned = cleaned.replace(/\b\d{4}\b/g, '') // Yılları kaldır
+
+  // Fazla boşlukları ve noktalama temizle
+  cleaned = cleaned.replace(/[^\w\s]/g, ' ')
+  cleaned = cleaned.replace(/\s+/g, ' ').trim()
+
+  return cleaned
 }
 
 function generatePrompt(news, customPrompt = null) {
-  // Kullanıcı özel prompt verdiyse onu kullan
+  // Temel kural: ASLA metin/yazı olmamalı
+  const noTextRule = `Photograph with absolutely no text, no words, no letters, no numbers, no signs, no banners, no watermarks anywhere in the image.`
+  const endRule = `Pure visual content only, zero text elements of any kind.`
+  const style = `Professional editorial photo, high quality, 4K resolution, cinematic lighting, shallow depth of field`
+
+  // Kullanıcı özel prompt verdiyse
   if (customPrompt && customPrompt.trim()) {
-    return `${customPrompt.trim()}. Style: professional photography, high quality, 4K, Instagram post. IMPORTANT: absolutely no text, no words, no letters, no writing, no watermarks, no logos anywhere in the image.`
+    const cleanedPrompt = cleanTextForPrompt(customPrompt)
+    return `${noTextRule} ${cleanedPrompt}. ${style}. ${endRule}`
   }
 
-  const { title_tr, category, instagram_summary } = news
+  const { title_tr, category } = news
 
-  // Başlığı İngilizce'ye çevir
-  const englishTitle = translateToEnglish(title_tr)
-  const englishSummary = translateToEnglish(instagram_summary || '')
+  // Başlıktan sahne tanımı çıkar (markalar ve sayılar temizlenmiş)
+  const cleanedTitle = cleanTextForPrompt(title_tr)
 
-  // Kategori stilini al
-  const categoryStyle = CATEGORY_STYLES[category] || CATEGORY_STYLES['DIGER']
+  // Kategori bazlı sahne al
+  const categoryScene = CATEGORY_SCENES[category] || CATEGORY_SCENES['DIGER']
 
-  // Prompt oluştur - yazı olmaması için çok güçlü vurgu
-  const prompt = `Professional editorial photograph for Instagram news post. Subject: ${englishTitle}. ${englishSummary ? `Scene: ${englishSummary}.` : ''} Visual style: ${categoryStyle}. Technical: professional photography, cinematic lighting, high quality, 4K resolution, vibrant colors, sharp focus. CRITICAL REQUIREMENT: The image must contain absolutely NO TEXT, NO WORDS, NO LETTERS, NO NUMBERS, NO WRITING, NO WATERMARKS, NO LOGOS, NO SIGNS WITH TEXT, NO CAPTIONS. Pure visual imagery only.`
+  // Prompt oluştur - sadece görsel sahne tanımı
+  const prompt = `${noTextRule} Scene: ${categoryScene}. Context: ${cleanedTitle}. ${style}. ${endRule}`
 
   return prompt
 }
@@ -78,7 +134,6 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  // API key kontrolü
   if (!GEMINI_API_KEY) {
     return res.status(500).json({ error: 'GEMINI_API_KEY is not configured' })
   }
@@ -93,7 +148,6 @@ export default async function handler(req, res) {
   console.log('News ID:', news.id)
   console.log('Title:', news.title_tr)
   console.log('Category:', news.category)
-  console.log('Custom prompt:', customPrompt || '(auto-generated)')
 
   try {
     // 1. Prompt oluştur
@@ -127,35 +181,46 @@ export default async function handler(req, res) {
     }
 
     const imagenData = await imagenResponse.json()
-    console.log('Imagen 4 response received')
+    console.log('Imagen 4 response received:', JSON.stringify(imagenData, null, 2))
 
-    // Base64 image'ı al
-    const base64Image = imagenData.predictions?.[0]?.bytesBase64Encoded
+    // Farklı yanıt yapılarını kontrol et
+    let base64Image = null
+
+    // Yapı 1: predictions[0].bytesBase64Encoded
+    if (imagenData.predictions?.[0]?.bytesBase64Encoded) {
+      base64Image = imagenData.predictions[0].bytesBase64Encoded
+    }
+    // Yapı 2: predictions[0].image.bytesBase64Encoded
+    else if (imagenData.predictions?.[0]?.image?.bytesBase64Encoded) {
+      base64Image = imagenData.predictions[0].image.bytesBase64Encoded
+    }
+    // Yapı 3: candidates[0].content
+    else if (imagenData.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data) {
+      base64Image = imagenData.candidates[0].content.parts[0].inlineData.data
+    }
+
     if (!base64Image) {
-      console.error('No image in response:', JSON.stringify(imagenData))
-      throw new Error('No image data in response')
+      console.error('No image in response. Full response:', JSON.stringify(imagenData))
+      // Hata mesajı varsa göster
+      const errorMsg = imagenData.error?.message || imagenData.promptFeedback?.blockReason || 'Unknown error'
+      throw new Error(`Imagen API error: ${errorMsg}`)
     }
 
     console.log('Image generated, size:', base64Image.length)
 
-    // 3. Supabase Storage'a yükle
+    // 3. Supabase Storage'a yükle - path: {news_id}/{timestamp}.png
     const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
-
-    // Base64'ü buffer'a çevir
     const buffer = Buffer.from(base64Image, 'base64')
-    const fileName = `${news.id}.png`
+    const timestamp = Date.now()
+    const storagePath = `${news.id}/${timestamp}.png`
 
-    console.log('Uploading to Supabase Storage...')
+    console.log('Uploading to Supabase Storage:', storagePath)
 
-    // Önce mevcut dosyayı sil (varsa)
-    await supabase.storage.from('news-images').remove([fileName])
-
-    // Yeni dosyayı yükle
     const { error: uploadError } = await supabase.storage
       .from('news-images')
-      .upload(fileName, buffer, {
+      .upload(storagePath, buffer, {
         contentType: 'image/png',
-        upsert: true
+        upsert: false
       })
 
     if (uploadError) {
@@ -166,26 +231,42 @@ export default async function handler(req, res) {
     // Public URL al
     const { data: urlData } = supabase.storage
       .from('news-images')
-      .getPublicUrl(fileName)
+      .getPublicUrl(storagePath)
 
     const imageUrl = urlData.publicUrl
     console.log('Image uploaded:', imageUrl)
 
-    // 4. news_items tablosunu güncelle
-    const { error: updateError } = await supabase
-      .from('news_items')
-      .update({ image_url: imageUrl })
-      .eq('id', news.id)
+    // 4. news_images tablosuna kaydet (news_items DEĞİL)
+    const { data: insertData, error: insertError } = await supabase
+      .from('news_images')
+      .insert({
+        news_id: news.id,
+        image_url: imageUrl,
+        storage_path: storagePath,
+        prompt: prompt,
+        is_selected: false
+      })
+      .select()
+      .single()
 
-    if (updateError) {
-      console.error('DB update error:', updateError)
-      // Görsel yüklendi ama DB güncellenemedi - yine de URL'i döndür
+    if (insertError) {
+      console.error('DB insert error:', insertError)
+      // Görsel yüklendi ama DB'ye kaydedilemedi
     }
 
     console.log('=== IMAGEN 4 GENERATION SUCCESS ===')
 
     return res.status(200).json({
       success: true,
+      image: insertData || {
+        id: timestamp,
+        news_id: news.id,
+        image_url: imageUrl,
+        storage_path: storagePath,
+        prompt: prompt,
+        is_selected: false,
+        created_at: new Date().toISOString()
+      },
       imageUrl,
       prompt,
       newsId: news.id
@@ -197,16 +278,14 @@ export default async function handler(req, res) {
 
     return res.status(500).json({
       error: error.message,
-      details: 'AI görsel üretimi başarısız oldu'
+      details: 'AI gorsel uretimi basarisiz oldu'
     })
   }
 }
 
 export const config = {
   api: {
-    bodyParser: {
-      sizeLimit: '10mb'
-    },
+    bodyParser: { sizeLimit: '10mb' },
     responseLimit: '10mb'
   }
 }
