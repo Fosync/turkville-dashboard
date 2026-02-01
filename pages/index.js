@@ -28,6 +28,12 @@ export default function Dashboard() {
   const [isSaving, setIsSaving] = useState(false)
   const [etkinlikNews, setEtkinlikNews] = useState([])
 
+  // Instagram content editing
+  const [instagramSummary, setInstagramSummary] = useState('')
+  const [instagramDetailed, setInstagramDetailed] = useState('')
+  const [instagramCaption, setInstagramCaption] = useState('')
+  const [isSavingInstagram, setIsSavingInstagram] = useState(false)
+
   useEffect(() => {
     fetchNews()
   }, [filter, categoryFilter])
@@ -95,6 +101,48 @@ export default function Dashboard() {
         setSelectedNews({ ...selectedNews, status: newStatus })
       }
     }
+  }
+
+  // Haber seçildiğinde Instagram alanlarını yükle
+  const handleSelectNews = (item) => {
+    setSelectedNews(item)
+    setInstagramSummary(item.instagram_summary || '')
+    setInstagramDetailed(item.instagram_detailed || '')
+    setInstagramCaption(item.instagram_caption || '')
+  }
+
+  // Instagram içeriklerini kaydet
+  const saveInstagramContent = async () => {
+    if (!selectedNews) return
+    setIsSavingInstagram(true)
+
+    try {
+      const { error } = await supabase
+        .from('news_items')
+        .update({
+          instagram_summary: instagramSummary,
+          instagram_detailed: instagramDetailed,
+          instagram_caption: instagramCaption
+        })
+        .eq('id', selectedNews.id)
+
+      if (error) throw error
+
+      // Local state'i güncelle
+      setSelectedNews({
+        ...selectedNews,
+        instagram_summary: instagramSummary,
+        instagram_detailed: instagramDetailed,
+        instagram_caption: instagramCaption
+      })
+
+      alert('Instagram içerikleri kaydedildi!')
+    } catch (error) {
+      console.error('Save error:', error)
+      alert('Kaydetme hatası: ' + error.message)
+    }
+
+    setIsSavingInstagram(false)
   }
 
   // Gemini API ile prompt önerisi al
@@ -472,7 +520,7 @@ ${selectedNews.content_snippet ? `Detay: ${selectedNews.content_snippet}` : ''}
                 {news.map((item) => (
                   <div 
                     key={item.id}
-                    onClick={() => setSelectedNews(item)}
+                    onClick={() => handleSelectNews(item)}
                     className="p-4 hover:bg-gray-50 cursor-pointer transition-colors"
                   >
                     <div className="flex items-start gap-4">
@@ -532,8 +580,13 @@ ${selectedNews.content_snippet ? `Detay: ${selectedNews.content_snippet}` : ''}
                       <p className="text-sm text-gray-500">{selectedNews.source}</p>
                     </div>
                   </div>
-                  <button 
-                    onClick={() => setSelectedNews(null)}
+                  <button
+                    onClick={() => {
+                      setSelectedNews(null)
+                      setInstagramSummary('')
+                      setInstagramDetailed('')
+                      setInstagramCaption('')
+                    }}
                     className="text-gray-400 hover:text-gray-600 text-2xl"
                   >
                     ×
@@ -574,6 +627,64 @@ ${selectedNews.content_snippet ? `Detay: ${selectedNews.content_snippet}` : ''}
                   </div>
                 </div>
 
+                {/* Instagram İçerikleri */}
+                <div className="border-t pt-4 mt-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                      📸 Instagram Icerikleri
+                    </h3>
+                    <button
+                      onClick={saveInstagramContent}
+                      disabled={isSavingInstagram}
+                      className="px-3 py-1 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50"
+                    >
+                      {isSavingInstagram ? 'Kaydediliyor...' : 'Kaydet'}
+                    </button>
+                  </div>
+
+                  {/* Slide 1 - Özet */}
+                  <div className="mb-3">
+                    <label className="block text-xs font-medium text-gray-500 mb-1">
+                      Slide 1 (Ozet)
+                    </label>
+                    <textarea
+                      value={instagramSummary}
+                      onChange={(e) => setInstagramSummary(e.target.value)}
+                      placeholder="Icerik henuz uretilmedi"
+                      className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
+                      rows={3}
+                    />
+                  </div>
+
+                  {/* Slide 2 - Detay */}
+                  <div className="mb-3">
+                    <label className="block text-xs font-medium text-gray-500 mb-1">
+                      Slide 2 (Detay)
+                    </label>
+                    <textarea
+                      value={instagramDetailed}
+                      onChange={(e) => setInstagramDetailed(e.target.value)}
+                      placeholder="Icerik henuz uretilmedi"
+                      className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
+                      rows={4}
+                    />
+                  </div>
+
+                  {/* Caption */}
+                  <div className="mb-3">
+                    <label className="block text-xs font-medium text-gray-500 mb-1">
+                      Instagram Caption
+                    </label>
+                    <textarea
+                      value={instagramCaption}
+                      onChange={(e) => setInstagramCaption(e.target.value)}
+                      placeholder="Icerik henuz uretilmedi"
+                      className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
+                      rows={3}
+                    />
+                  </div>
+                </div>
+
                 {/* ETKINLIK kategorisi için Post Üret butonu */}
                 {selectedNews.category === 'ETKINLIK' && (
                   <div className="border-t pt-4 mt-4">
@@ -581,7 +692,7 @@ ${selectedNews.content_snippet ? `Detay: ${selectedNews.content_snippet}` : ''}
                       onClick={openPostGenerator}
                       className="w-full px-4 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 font-medium flex items-center justify-center gap-2"
                     >
-                      📸 Instagram Post Üret
+                      📸 Instagram Post Uret
                     </button>
                   </div>
                 )}
@@ -593,7 +704,7 @@ ${selectedNews.content_snippet ? `Detay: ${selectedNews.content_snippet}` : ''}
                     rel="noopener noreferrer"
                     className="text-red-600 hover:text-red-700 text-sm font-medium"
                   >
-                    🔗 Haberi Oku →
+                    Haberi Oku
                   </a>
                 </div>
               </div>
