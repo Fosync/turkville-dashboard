@@ -1,0 +1,199 @@
+// Imagen 3 via Gemini API - AI Image Generation
+import { createClient } from '@supabase/supabase-js'
+
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || 'AIzaSyB5w3fvek5gkxhcZIe_5r8XKtgQHKz8Nws'
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+// Kategori bazlı stil ekleri
+const CATEGORY_STYLES = {
+  'GOCMENLIK': 'passport, airport terminal, immigration office, travel documents, diverse people',
+  'EKONOMI': 'financial charts, stock market, money, business district, modern office',
+  'GUNDEM': 'parliament building, city hall, urban landscape, news setting, political',
+  'HAVA': 'weather conditions, dramatic sky, atmospheric, meteorological',
+  'GUVENLIK': 'police, security, safety equipment, protection, emergency services',
+  'ETKINLIK': 'community event, celebration, festival, gathering, concert venue',
+  'IS_ILANI': 'job interview, office workspace, career, professional setting',
+  'DENEY': 'laboratory, science, research, experimental, innovation',
+  'DIGER': 'news illustration, editorial, informative'
+}
+
+// Türkçe-İngilizce basit çeviri
+const TRANSLATIONS = {
+  'kanada': 'Canada', 'toronto': 'Toronto', 'türk': 'Turkish', 'türkiye': 'Turkey',
+  'haber': 'news', 'etkinlik': 'event', 'festival': 'festival', 'konser': 'concert',
+  'toplantı': 'meeting', 'kutlama': 'celebration', 'parti': 'party',
+  'ekonomi': 'economy', 'iş': 'business', 'para': 'money', 'dolar': 'dollar',
+  'göçmenlik': 'immigration', 'vize': 'visa', 'pasaport': 'passport',
+  'hava': 'weather', 'kar': 'snow', 'yağmur': 'rain', 'güneş': 'sunny',
+  'polis': 'police', 'güvenlik': 'security', 'acil': 'emergency',
+  'seçim': 'election', 'hükümet': 'government', 'politika': 'politics',
+  'okul': 'school', 'eğitim': 'education', 'üniversite': 'university',
+  'sağlık': 'health', 'hastane': 'hospital', 'doktor': 'doctor',
+  'spor': 'sports', 'futbol': 'soccer', 'basketbol': 'basketball',
+  'müzik': 'music', 'sanat': 'art', 'kültür': 'culture',
+  'yemek': 'food', 'restoran': 'restaurant', 'lezzet': 'cuisine'
+}
+
+function translateToEnglish(text) {
+  if (!text) return ''
+  let result = text.toLowerCase()
+
+  // Türkçe karakterleri değiştir
+  result = result
+    .replace(/ğ/g, 'g').replace(/ü/g, 'u').replace(/ş/g, 's')
+    .replace(/ı/g, 'i').replace(/ö/g, 'o').replace(/ç/g, 'c')
+
+  // Bilinen kelimeleri çevir
+  for (const [tr, en] of Object.entries(TRANSLATIONS)) {
+    const regex = new RegExp(tr.replace(/ğ/g, 'g').replace(/ü/g, 'u').replace(/ş/g, 's').replace(/ı/g, 'i').replace(/ö/g, 'o').replace(/ç/g, 'c'), 'gi')
+    result = result.replace(regex, en)
+  }
+
+  return result
+}
+
+function generatePrompt(news) {
+  const { title_tr, category, instagram_summary } = news
+
+  // Başlığı İngilizce'ye çevir
+  const englishTitle = translateToEnglish(title_tr)
+  const englishSummary = translateToEnglish(instagram_summary || '')
+
+  // Kategori stilini al
+  const categoryStyle = CATEGORY_STYLES[category] || CATEGORY_STYLES['DIGER']
+
+  // Ana prompt oluştur
+  const prompt = `Professional editorial illustration for Instagram news post. Topic: ${englishTitle}. ${englishSummary ? `Context: ${englishSummary}.` : ''} Visual elements: ${categoryStyle}. Style: modern, clean, professional photography or illustration, high quality, vibrant colors, editorial magazine quality. Requirements: No text overlay, no watermark, no logos, no written words in the image. Square format, Instagram-ready composition.`
+
+  return prompt
+}
+
+export default async function handler(req, res) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' })
+  }
+
+  const { news } = req.body
+
+  if (!news || !news.id) {
+    return res.status(400).json({ error: 'News data with id is required' })
+  }
+
+  console.log('=== IMAGEN 3 GENERATION START ===')
+  console.log('News ID:', news.id)
+  console.log('Title:', news.title_tr)
+  console.log('Category:', news.category)
+
+  try {
+    // 1. Prompt oluştur
+    const prompt = generatePrompt(news)
+    console.log('Generated prompt:', prompt)
+
+    // 2. Imagen 3 API çağrısı
+    console.log('Calling Imagen 3 API...')
+    const imagenResponse = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          instances: [{ prompt }],
+          parameters: {
+            sampleCount: 1,
+            aspectRatio: '1:1'
+          }
+        })
+      }
+    )
+
+    if (!imagenResponse.ok) {
+      const errorText = await imagenResponse.text()
+      console.error('Imagen API error:', errorText)
+      throw new Error(`Imagen API error: ${imagenResponse.status} - ${errorText}`)
+    }
+
+    const imagenData = await imagenResponse.json()
+    console.log('Imagen response received')
+
+    // Base64 image'ı al
+    const base64Image = imagenData.predictions?.[0]?.bytesBase64Encoded
+    if (!base64Image) {
+      throw new Error('No image data in response')
+    }
+
+    console.log('Image generated, size:', base64Image.length)
+
+    // 3. Supabase Storage'a yükle
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+
+    // Base64'ü buffer'a çevir
+    const buffer = Buffer.from(base64Image, 'base64')
+    const fileName = `${news.id}.png`
+
+    console.log('Uploading to Supabase Storage...')
+
+    // Önce mevcut dosyayı sil (varsa)
+    await supabase.storage.from('news-images').remove([fileName])
+
+    // Yeni dosyayı yükle
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('news-images')
+      .upload(fileName, buffer, {
+        contentType: 'image/png',
+        upsert: true
+      })
+
+    if (uploadError) {
+      console.error('Upload error:', uploadError)
+      throw new Error(`Storage upload error: ${uploadError.message}`)
+    }
+
+    // Public URL al
+    const { data: urlData } = supabase.storage
+      .from('news-images')
+      .getPublicUrl(fileName)
+
+    const imageUrl = urlData.publicUrl
+    console.log('Image uploaded:', imageUrl)
+
+    // 4. news_items tablosunu güncelle
+    const { error: updateError } = await supabase
+      .from('news_items')
+      .update({ image_url: imageUrl })
+      .eq('id', news.id)
+
+    if (updateError) {
+      console.error('Update error:', updateError)
+      // Görsel yüklendi ama DB güncellenemedi - yine de URL'i döndür
+    }
+
+    console.log('=== IMAGEN 3 GENERATION SUCCESS ===')
+
+    return res.status(200).json({
+      success: true,
+      imageUrl,
+      prompt,
+      newsId: news.id
+    })
+
+  } catch (error) {
+    console.error('=== IMAGEN 3 GENERATION ERROR ===')
+    console.error(error)
+
+    return res.status(500).json({
+      error: error.message,
+      details: 'AI görsel üretimi başarısız oldu'
+    })
+  }
+}
+
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: '10mb'
+    }
+  }
+}

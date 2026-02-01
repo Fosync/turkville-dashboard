@@ -38,6 +38,10 @@ export default function Dashboard() {
   const [instagramCaption, setInstagramCaption] = useState('')
   const [isSavingInstagram, setIsSavingInstagram] = useState(false)
 
+  // AI Image Generation
+  const [isGeneratingAIImage, setIsGeneratingAIImage] = useState(false)
+  const [aiGeneratedImageUrl, setAiGeneratedImageUrl] = useState(null)
+
   useEffect(() => {
     fetchNews()
   }, [filter, categoryFilter, dateFilter])
@@ -165,6 +169,48 @@ export default function Dashboard() {
     }
 
     setIsSavingInstagram(false)
+  }
+
+  // AI ile görsel üret (Imagen 3)
+  const generateAIImage = async () => {
+    if (!selectedNews) return
+    setIsGeneratingAIImage(true)
+    setAiGeneratedImageUrl(null)
+
+    try {
+      const response = await fetch('/api/generate-ai-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          news: {
+            id: selectedNews.id,
+            title_tr: selectedNews.title_tr,
+            category: selectedNews.category,
+            instagram_summary: instagramSummary || selectedNews.instagram_summary
+          }
+        })
+      })
+
+      const data = await response.json()
+
+      if (data.error) {
+        throw new Error(data.error)
+      }
+
+      // Görsel URL'ini güncelle
+      setAiGeneratedImageUrl(data.imageUrl)
+      setSelectedNews({
+        ...selectedNews,
+        image_url: data.imageUrl
+      })
+
+      alert('AI görseli başarıyla oluşturuldu!')
+    } catch (error) {
+      console.error('AI Image error:', error)
+      alert('AI görsel üretimi başarısız: ' + error.message)
+    }
+
+    setIsGeneratingAIImage(false)
   }
 
   // Gemini API ile prompt önerisi al
@@ -805,17 +851,36 @@ ${selectedNews.content_snippet ? `Detay: ${selectedNews.content_snippet}` : ''}
                     />
                   </div>
 
+                  {/* AI Görsel Önizleme */}
+                  {(selectedNews.image_url || aiGeneratedImageUrl) && (
+                    <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+                      <label className="block text-xs font-medium text-gray-500 mb-2">Mevcut Gorsel</label>
+                      <img
+                        src={aiGeneratedImageUrl || selectedNews.image_url}
+                        alt="News image"
+                        className="w-full max-w-[200px] rounded-lg shadow-sm"
+                      />
+                    </div>
+                  )}
+
                   {/* Görsel Oluştur ve Post Üret Butonları */}
                   <div className="flex gap-2 mt-4">
                     <button
-                      onClick={() => {
-                        const title = selectedNews.title_tr || ''
-                        setImagePrompt(title)
-                        setShowImageGenerator(true)
-                      }}
-                      className="flex-1 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 font-medium text-sm"
+                      onClick={generateAIImage}
+                      disabled={isGeneratingAIImage}
+                      className="flex-1 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      🎨 Gorsel Olustur
+                      {isGeneratingAIImage ? (
+                        <span className="flex items-center justify-center gap-2">
+                          <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                          </svg>
+                          AI Uretiyor...
+                        </span>
+                      ) : (
+                        '🤖 AI Gorsel Uret'
+                      )}
                     </button>
                     <button
                       onClick={openPostGenerator}
