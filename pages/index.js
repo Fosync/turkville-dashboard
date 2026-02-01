@@ -5,6 +5,56 @@ import { useRouter } from 'next/router'
 
 const GEMINI_API_KEY = 'AIzaSyB5w3fvek5gkxhcZIe_5r8XKtgQHKz8Nws'
 
+// 21 Kategori Badge Görselleri (mevcut dosyalarla eşleştirilmiş)
+const CATEGORY_BADGES = {
+  'GOCMENLIK': '/images/Turkville_gocmenlik.png',
+  'EKONOMI': '/images/Turkville_ekonomi.png',
+  'GUNDEM': '/images/Turkville_gundem.png',
+  'HAVA': '/images/Turkville_haber.png', // hava için haber kullanılıyor
+  'GUVENLIK': '/images/Turkville_siyaset.png', // güvenlik için siyaset kullanılıyor
+  'ETKINLIK': '/images/Turkville_etkinlik.png',
+  'IS_ILANI': '/images/Turkville_kariyer.png', // iş ilanı için kariyer kullanılıyor
+  'DENEY': '/images/Turkville_teknoloji.png', // deney için teknoloji kullanılıyor
+  'DIGER': '/images/Turkville_haber.png', // diğer için haber kullanılıyor
+  'HAP_BILGI': '/images/Turkville_hap_bilgi.png',
+  'KULTUR': '/images/Turkville_magazin.png', // kültür için magazin kullanılıyor
+  'SPOR': '/images/Turkville_spor.png',
+  'TEKNOLOJI': '/images/Turkville_teknoloji.png',
+  'SAGLIK': '/images/Turkville_saglik.png',
+  'EGITIM': '/images/Turkville_egitim.png',
+  'CEVRE': '/images/Turkville_yasam.png', // çevre için yaşam kullanılıyor
+  'EMLAK': '/images/Turkville_emlak.png',
+  'OTOMOTIV': '/images/Turkville_alisveris.png', // otomotiv için alışveriş kullanılıyor
+  'YEME_ICME': '/images/Turkville_yasam.png', // yeme içme için yaşam kullanılıyor
+  'SEYAHAT': '/images/Turkville_seyahat.png',
+  'YASAM': '/images/Turkville_yasam.png'
+}
+
+// Kategori Etiketleri (Türkçe gösterim)
+const CATEGORY_LABELS = {
+  'CEVRE': 'Çevre',
+  'DENEY': 'Deney',
+  'DIGER': 'Diğer',
+  'EGITIM': 'Eğitim',
+  'EKONOMI': 'Ekonomi',
+  'EMLAK': 'Emlak',
+  'ETKINLIK': 'Etkinlik',
+  'GOCMENLIK': 'Göçmenlik',
+  'GUNDEM': 'Gündem',
+  'GUVENLIK': 'Güvenlik',
+  'HAP_BILGI': 'Hap Bilgi',
+  'HAVA': 'Hava',
+  'IS_ILANI': 'İş İlanı',
+  'KULTUR': 'Kültür',
+  'OTOMOTIV': 'Otomotiv',
+  'SAGLIK': 'Sağlık',
+  'SEYAHAT': 'Seyahat',
+  'SPOR': 'Spor',
+  'TEKNOLOJI': 'Teknoloji',
+  'YASAM': 'Yaşam',
+  'YEME_ICME': 'Yeme İçme'
+}
+
 export default function Dashboard() {
   const router = useRouter()
   const [news, setNews] = useState([])
@@ -640,15 +690,27 @@ ${selectedNews.content_snippet ? `Detay: ${selectedNews.content_snippet}` : ''}
 
   const getCategoryEmoji = (category) => {
     const emojis = {
-      'GOCMENLIK': '🇨🇦',
-      'EKONOMI': '💰',
-      'HAVA': '🌤️',
-      'GUVENLIK': '🚨',
-      'IS_ILANI': '💼',
-      'ETKINLIK': '🎉',
-      'GUNDEM': '📰',
+      'CEVRE': '🌿',
       'DENEY': '🧪',
-      'DIGER': '📌'
+      'DIGER': '📌',
+      'EGITIM': '📚',
+      'EKONOMI': '💰',
+      'EMLAK': '🏠',
+      'ETKINLIK': '🎉',
+      'GOCMENLIK': '🇨🇦',
+      'GUNDEM': '📰',
+      'GUVENLIK': '🚨',
+      'HAP_BILGI': '💊',
+      'HAVA': '🌤️',
+      'IS_ILANI': '💼',
+      'KULTUR': '🎭',
+      'OTOMOTIV': '🚗',
+      'SAGLIK': '🏥',
+      'SEYAHAT': '✈️',
+      'SPOR': '⚽',
+      'TEKNOLOJI': '💻',
+      'YASAM': '🌟',
+      'YEME_ICME': '🍽️'
     }
     return emojis[category] || '📌'
   }
@@ -664,7 +726,7 @@ ${selectedNews.content_snippet ? `Detay: ${selectedNews.content_snippet}` : ''}
     return styles[status] || 'bg-gray-100 text-gray-800'
   }
 
-  const categories = ['GOCMENLIK', 'EKONOMI', 'HAVA', 'GUVENLIK', 'IS_ILANI', 'ETKINLIK', 'GUNDEM', 'DENEY', 'DIGER']
+  const categories = ['CEVRE', 'DENEY', 'DIGER', 'EGITIM', 'EKONOMI', 'EMLAK', 'ETKINLIK', 'GOCMENLIK', 'GUNDEM', 'GUVENLIK', 'HAP_BILGI', 'HAVA', 'IS_ILANI', 'KULTUR', 'OTOMOTIV', 'SAGLIK', 'SEYAHAT', 'SPOR', 'TEKNOLOJI', 'YASAM', 'YEME_ICME']
 
   return (
     <>
@@ -755,9 +817,9 @@ ${selectedNews.content_snippet ? `Detay: ${selectedNews.content_snippet}` : ''}
                   onChange={(e) => setCategoryFilter(e.target.value)}
                   className="px-3 py-2 border rounded-lg bg-white"
                 >
-                  <option value="all">Tum Kategoriler</option>
+                  <option value="all">Tüm Kategoriler</option>
                   {categories.map(cat => (
-                    <option key={cat} value={cat}>{getCategoryEmoji(cat)} {cat}</option>
+                    <option key={cat} value={cat}>{getCategoryEmoji(cat)} {CATEGORY_LABELS[cat] || cat}</option>
                   ))}
                 </select>
               </div>
@@ -1143,6 +1205,7 @@ ${selectedNews.content_snippet ? `Detay: ${selectedNews.content_snippet}` : ''}
                           title: instagramSummary || selectedNews.instagram_summary || selectedNews.title_tr,
                           slide2Text: instagramDetailed || selectedNews.instagram_detailed,
                           newsId: selectedNews.id,
+                          category: selectedNews.category,
                           mode: 'visual'
                         }
                         localStorage.setItem('editorData', JSON.stringify(editorData))

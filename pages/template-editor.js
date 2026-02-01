@@ -65,6 +65,31 @@ const GRADIENT_DIRECTIONS = [
   { name: 'Çapraz ↖', value: 'to top left' }
 ]
 
+// 21 Kategori Badge Görselleri (mevcut dosyalarla eşleştirilmiş)
+const CATEGORY_BADGES = {
+  'GOCMENLIK': '/images/Turkville_gocmenlik.png',
+  'EKONOMI': '/images/Turkville_ekonomi.png',
+  'GUNDEM': '/images/Turkville_gundem.png',
+  'HAVA': '/images/Turkville_haber.png',
+  'GUVENLIK': '/images/Turkville_siyaset.png',
+  'ETKINLIK': '/images/Turkville_etkinlik.png',
+  'IS_ILANI': '/images/Turkville_kariyer.png',
+  'DENEY': '/images/Turkville_teknoloji.png',
+  'DIGER': '/images/Turkville_haber.png',
+  'HAP_BILGI': '/images/Turkville_hap_bilgi.png',
+  'KULTUR': '/images/Turkville_magazin.png',
+  'SPOR': '/images/Turkville_spor.png',
+  'TEKNOLOJI': '/images/Turkville_teknoloji.png',
+  'SAGLIK': '/images/Turkville_saglik.png',
+  'EGITIM': '/images/Turkville_egitim.png',
+  'CEVRE': '/images/Turkville_yasam.png',
+  'EMLAK': '/images/Turkville_emlak.png',
+  'OTOMOTIV': '/images/Turkville_alisveris.png',
+  'YEME_ICME': '/images/Turkville_yasam.png',
+  'SEYAHAT': '/images/Turkville_seyahat.png',
+  'YASAM': '/images/Turkville_yasam.png'
+}
+
 export default function TemplateEditor() {
   // Canvas state
   const [canvasWidth, setCanvasWidth] = useState(1080)
@@ -134,7 +159,7 @@ export default function TemplateEditor() {
       x: 0, y: 0, width: canvasWidth, height: canvasHeight, zIndex: 2, opacity: 85,
       locked: false, visible: true, rotation: 0,
       gradientStart: 'rgba(0,0,0,0.9)', gradientEnd: 'rgba(0,0,0,0)', gradientDirection: 'to top' },
-    { id: 'badge', type: 'image', name: '[UI] Etiket', src: '/images/turkvilleEtkinlik.png',
+    { id: 'badge', type: 'image', name: '[UI] Etiket', src: '/images/Turkville_haber.png',
       x: 30, y: 30, width: 180, height: 60, zIndex: 10, opacity: 100, locked: true, visible: true, rotation: 0, objectFit: 'contain' },
     { id: 'title', type: 'text', name: '[TXT] Başlık', text: 'ÖRNEK ETKİNLİK BAŞLIĞI',
       x: 30, y: canvasHeight - 250, width: canvasWidth - 60, height: 150, zIndex: 11, opacity: 100,
@@ -149,7 +174,7 @@ export default function TemplateEditor() {
   const getTextElements = () => [
     { id: 'colorBg', type: 'color', name: '[BG] Renk', color: bgColor,
       x: 0, y: 0, width: canvasWidth, height: canvasHeight, zIndex: 1, opacity: 100, locked: true, visible: true },
-    { id: 'badge', type: 'image', name: '[UI] Etiket', src: '/images/turkvilleEtkinlik.png',
+    { id: 'badge', type: 'image', name: '[UI] Etiket', src: '/images/Turkville_haber.png',
       x: 30, y: 30, width: 180, height: 60, zIndex: 10, opacity: 100, locked: true, visible: true, rotation: 0, objectFit: 'contain' },
     { id: 'title', type: 'text', name: '[TXT] İçerik', text: 'UZUN METİN HABERİ',
       x: 30, y: 150, width: canvasWidth - 60, height: canvasHeight - 300, zIndex: 11, opacity: 100,
@@ -201,12 +226,17 @@ export default function TemplateEditor() {
           setTemplateMode(editorData.mode)
         }
 
-        // Başlık metnini güncelle
-        if (editorData.title) {
-          setElements(prev => prev.map(el =>
-            el.id === 'title' ? { ...el, text: editorData.title } : el
-          ))
-        }
+        // Başlık metnini ve kategori badge'ini güncelle
+        setElements(prev => prev.map(el => {
+          if (el.id === 'title' && editorData.title) {
+            return { ...el, text: editorData.title }
+          }
+          if (el.id === 'badge' && editorData.category) {
+            const badgeSrc = CATEGORY_BADGES[editorData.category] || '/images/Turkville_haber.png'
+            return { ...el, src: badgeSrc }
+          }
+          return el
+        }))
 
         // Temizle - bir kere kullanıldıktan sonra
         localStorage.removeItem('editorData')

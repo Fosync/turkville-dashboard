@@ -2,6 +2,31 @@ import puppeteer from 'puppeteer'
 import fs from 'fs'
 import path from 'path'
 
+// 21 Kategori Badge Dosya Adları (mevcut dosyalarla eşleştirilmiş)
+const CATEGORY_BADGE_FILES = {
+  'GOCMENLIK': 'Turkville_gocmenlik.png',
+  'EKONOMI': 'Turkville_ekonomi.png',
+  'GUNDEM': 'Turkville_gundem.png',
+  'HAVA': 'Turkville_haber.png',
+  'GUVENLIK': 'Turkville_siyaset.png',
+  'ETKINLIK': 'Turkville_etkinlik.png',
+  'IS_ILANI': 'Turkville_kariyer.png',
+  'DENEY': 'Turkville_teknoloji.png',
+  'DIGER': 'Turkville_haber.png',
+  'HAP_BILGI': 'Turkville_hap_bilgi.png',
+  'KULTUR': 'Turkville_magazin.png',
+  'SPOR': 'Turkville_spor.png',
+  'TEKNOLOJI': 'Turkville_teknoloji.png',
+  'SAGLIK': 'Turkville_saglik.png',
+  'EGITIM': 'Turkville_egitim.png',
+  'CEVRE': 'Turkville_yasam.png',
+  'EMLAK': 'Turkville_emlak.png',
+  'OTOMOTIV': 'Turkville_alisveris.png',
+  'YEME_ICME': 'Turkville_yasam.png',
+  'SEYAHAT': 'Turkville_seyahat.png',
+  'YASAM': 'Turkville_yasam.png'
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
@@ -25,7 +50,9 @@ export default async function handler(req, res) {
     gradientStart = 'rgba(0,0,0,0.9)',
     gradientEnd = 'rgba(0,0,0,0)',
     gradientDirection = 'to top',
-    gradientOpacity = 85
+    gradientOpacity = 85,
+    // Category for badge
+    category = 'DIGER'
   } = req.body
 
   // Quality settings
@@ -119,7 +146,10 @@ export default async function handler(req, res) {
       ? `data:image/png;base64,${fs.readFileSync(gradientPath).toString('base64')}`
       : ''
 
-    const badgePath = path.join(publicDir, 'images', 'turkvilleEtkinlik.png')
+    // Kategoriye göre badge dosyasını seç
+    const finalCategory = data.category || category
+    const badgeFileName = CATEGORY_BADGE_FILES[finalCategory] || CATEGORY_BADGE_FILES['DIGER']
+    const badgePath = path.join(publicDir, 'images', badgeFileName)
     const badgeBase64 = fs.existsSync(badgePath)
       ? `data:image/png;base64,${fs.readFileSync(badgePath).toString('base64')}`
       : ''

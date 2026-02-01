@@ -5,17 +5,29 @@ const GEMINI_API_KEY = process.env.GEMINI_API_KEY
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-// Kategori bazlı sahne tanımları (marka ismi YOK)
+// Kategori bazlı sahne tanımları (marka ismi YOK) - 21 Kategori
 const CATEGORY_SCENES = {
-  'GOCMENLIK': 'diverse group of people in an airport terminal, travel documents, luggage, Canadian maple leaf flag in background',
-  'EKONOMI': 'modern business district skyline, glass buildings, financial district atmosphere, city lights',
-  'GUNDEM': 'government building with classical architecture, urban cityscape, official atmosphere',
-  'HAVA': 'dramatic sky with clouds, city skyline silhouette, weather atmosphere',
-  'GUVENLIK': 'city street at night with blue and red lights reflection, urban safety atmosphere',
-  'ETKINLIK': 'colorful community gathering, festive decorations, people celebrating, warm lighting',
-  'IS_ILANI': 'modern office interior, professional workspace, natural light through windows',
+  'CEVRE': 'lush green forest, sustainable energy, nature landscape, clean environment',
   'DENEY': 'laboratory equipment, scientific research setting, modern technology',
-  'DIGER': 'modern urban cityscape, clean architecture, professional atmosphere'
+  'DIGER': 'modern urban cityscape, clean architecture, professional atmosphere',
+  'EGITIM': 'university campus, students studying, library interior, educational setting',
+  'EKONOMI': 'modern business district skyline, glass buildings, financial district atmosphere, city lights',
+  'EMLAK': 'modern house exterior, real estate property, residential neighborhood, for sale',
+  'ETKINLIK': 'colorful community gathering, festive decorations, people celebrating, warm lighting',
+  'GOCMENLIK': 'diverse group of people in an airport terminal, travel documents, luggage, Canadian maple leaf flag in background',
+  'GUNDEM': 'government building with classical architecture, urban cityscape, official atmosphere',
+  'GUVENLIK': 'city street at night with blue and red lights reflection, urban safety atmosphere',
+  'HAP_BILGI': 'infographic style, knowledge sharing, quick facts, educational visual',
+  'HAVA': 'dramatic sky with clouds, city skyline silhouette, weather atmosphere',
+  'IS_ILANI': 'modern office interior, professional workspace, natural light through windows',
+  'KULTUR': 'art gallery interior, cultural event, theater stage, artistic atmosphere',
+  'OTOMOTIV': 'modern car showroom, automotive industry, vehicle display, dealership',
+  'SAGLIK': 'hospital interior, medical equipment, healthcare setting, doctor consultation',
+  'SEYAHAT': 'airplane taking off, travel destination, vacation scenery, tourism',
+  'SPOR': 'sports stadium, athletic competition, fitness activity, sports equipment',
+  'TEKNOLOJI': 'modern tech office, computer screens, innovation lab, digital technology',
+  'YASAM': 'lifestyle scene, daily life, urban living, community gathering',
+  'YEME_ICME': 'restaurant interior, food presentation, dining experience, culinary arts'
 }
 
 // Marka isimlerini genel tanımlarla değiştir
