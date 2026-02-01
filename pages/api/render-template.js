@@ -1,31 +1,10 @@
 import puppeteer from 'puppeteer'
 import fs from 'fs'
 import path from 'path'
+import { createClient } from '@supabase/supabase-js'
 
-// 21 Kategori Badge Dosya Adları (mevcut dosyalarla eşleştirilmiş)
-const CATEGORY_BADGE_FILES = {
-  'GOCMENLIK': 'Turkville_gocmenlik.png',
-  'EKONOMI': 'Turkville_ekonomi.png',
-  'GUNDEM': 'Turkville_gundem.png',
-  'HAVA': 'Turkville_haber.png',
-  'GUVENLIK': 'Turkville_siyaset.png',
-  'ETKINLIK': 'Turkville_etkinlik.png',
-  'IS_ILANI': 'Turkville_kariyer.png',
-  'DENEY': 'Turkville_teknoloji.png',
-  'DIGER': 'Turkville_haber.png',
-  'HAP_BILGI': 'Turkville_hap_bilgi.png',
-  'KULTUR': 'Turkville_magazin.png',
-  'SPOR': 'Turkville_spor.png',
-  'TEKNOLOJI': 'Turkville_teknoloji.png',
-  'SAGLIK': 'Turkville_saglik.png',
-  'EGITIM': 'Turkville_egitim.png',
-  'CEVRE': 'Turkville_yasam.png',
-  'EMLAK': 'Turkville_emlak.png',
-  'OTOMOTIV': 'Turkville_alisveris.png',
-  'YEME_ICME': 'Turkville_yasam.png',
-  'SEYAHAT': 'Turkville_seyahat.png',
-  'YASAM': 'Turkville_yasam.png'
-}
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
+const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -146,10 +125,27 @@ export default async function handler(req, res) {
       ? `data:image/png;base64,${fs.readFileSync(gradientPath).toString('base64')}`
       : ''
 
-    // Kategoriye göre badge dosyasını seç
+    // Kategoriye göre badge dosyasını DB'den al
     const finalCategory = data.category || category
-    const badgeFileName = CATEGORY_BADGE_FILES[finalCategory] || CATEGORY_BADGE_FILES['DIGER']
-    const badgePath = path.join(publicDir, 'images', badgeFileName)
+    let badgePath = path.join(publicDir, 'images', 'turkvillelogo.png') // fallback
+
+    try {
+      const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
+      const { data: categoryData } = await supabase
+        .from('categories')
+        .select('badge_path')
+        .eq('key', finalCategory)
+        .single()
+
+      if (categoryData?.badge_path) {
+        // badge_path: /images/xxx.png -> public/images/xxx.png
+        const relativePath = categoryData.badge_path.replace(/^\//, '')
+        badgePath = path.join(publicDir, '..', relativePath)
+      }
+    } catch (dbError) {
+      console.log('Category DB lookup failed, using fallback:', dbError.message)
+    }
+
     const badgeBase64 = fs.existsSync(badgePath)
       ? `data:image/png;base64,${fs.readFileSync(badgePath).toString('base64')}`
       : ''

@@ -65,31 +65,6 @@ const GRADIENT_DIRECTIONS = [
   { name: 'Çapraz ↖', value: 'to top left' }
 ]
 
-// 21 Kategori Badge Görselleri (mevcut dosyalarla eşleştirilmiş)
-const CATEGORY_BADGES = {
-  'GOCMENLIK': '/images/Turkville_gocmenlik.png',
-  'EKONOMI': '/images/Turkville_ekonomi.png',
-  'GUNDEM': '/images/Turkville_gundem.png',
-  'HAVA': '/images/Turkville_haber.png',
-  'GUVENLIK': '/images/Turkville_siyaset.png',
-  'ETKINLIK': '/images/Turkville_etkinlik.png',
-  'IS_ILANI': '/images/Turkville_kariyer.png',
-  'DENEY': '/images/Turkville_teknoloji.png',
-  'DIGER': '/images/Turkville_haber.png',
-  'HAP_BILGI': '/images/Turkville_hap_bilgi.png',
-  'KULTUR': '/images/Turkville_magazin.png',
-  'SPOR': '/images/Turkville_spor.png',
-  'TEKNOLOJI': '/images/Turkville_teknoloji.png',
-  'SAGLIK': '/images/Turkville_saglik.png',
-  'EGITIM': '/images/Turkville_egitim.png',
-  'CEVRE': '/images/Turkville_yasam.png',
-  'EMLAK': '/images/Turkville_emlak.png',
-  'OTOMOTIV': '/images/Turkville_alisveris.png',
-  'YEME_ICME': '/images/Turkville_yasam.png',
-  'SEYAHAT': '/images/Turkville_seyahat.png',
-  'YASAM': '/images/Turkville_yasam.png'
-}
-
 export default function TemplateEditor() {
   // Canvas state
   const [canvasWidth, setCanvasWidth] = useState(1080)
@@ -149,6 +124,9 @@ export default function TemplateEditor() {
   const [imageCounter, setImageCounter] = useState(1)
   const [shapeCounter, setShapeCounter] = useState(1)
 
+  // Kategoriler (DB'den)
+  const [categoriesDB, setCategoriesDB] = useState([])
+
   const fileInputRef = useRef(null)
   const canvasRef = useRef(null)
   const canvasContainerRef = useRef(null)
@@ -198,6 +176,26 @@ export default function TemplateEditor() {
     setHistoryIndex(-1)
   }, [templateMode])
 
+  // Kategorileri DB'den çek
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await fetch('/api/categories')
+        const data = await response.json()
+        setCategoriesDB(data.categories || [])
+      } catch (error) {
+        console.error('fetchCategories error:', error)
+      }
+    }
+    fetchCategories()
+  }, [])
+
+  // Kategori badge'ini bul
+  const getCategoryBadge = (key) => {
+    const cat = categoriesDB.find(c => c.key === key)
+    return cat?.badge_path || '/images/turkvillelogo.png'
+  }
+
   // Load background image from localStorage (from "Gorsel Olustur")
   useEffect(() => {
     const savedBg = localStorage.getItem('backgroundImage')
@@ -232,7 +230,9 @@ export default function TemplateEditor() {
             return { ...el, text: editorData.title }
           }
           if (el.id === 'badge' && editorData.category) {
-            const badgeSrc = CATEGORY_BADGES[editorData.category] || '/images/Turkville_haber.png'
+            // DB'den badge'i bul, yoksa fallback kullan
+            const cat = categoriesDB.find(c => c.key === editorData.category)
+            const badgeSrc = cat?.badge_path || '/images/turkvillelogo.png'
             return { ...el, src: badgeSrc }
           }
           return el
@@ -245,7 +245,7 @@ export default function TemplateEditor() {
         localStorage.removeItem('editorData')
       }
     }
-  }, [])
+  }, [categoriesDB])
 
   // Save to history
   const saveHistory = useCallback((newElements) => {

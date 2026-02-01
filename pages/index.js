@@ -5,56 +5,6 @@ import { useRouter } from 'next/router'
 
 const GEMINI_API_KEY = 'AIzaSyB5w3fvek5gkxhcZIe_5r8XKtgQHKz8Nws'
 
-// 21 Kategori Badge Görselleri (mevcut dosyalarla eşleştirilmiş)
-const CATEGORY_BADGES = {
-  'GOCMENLIK': '/images/Turkville_gocmenlik.png',
-  'EKONOMI': '/images/Turkville_ekonomi.png',
-  'GUNDEM': '/images/Turkville_gundem.png',
-  'HAVA': '/images/Turkville_haber.png', // hava için haber kullanılıyor
-  'GUVENLIK': '/images/Turkville_siyaset.png', // güvenlik için siyaset kullanılıyor
-  'ETKINLIK': '/images/Turkville_etkinlik.png',
-  'IS_ILANI': '/images/Turkville_kariyer.png', // iş ilanı için kariyer kullanılıyor
-  'DENEY': '/images/Turkville_teknoloji.png', // deney için teknoloji kullanılıyor
-  'DIGER': '/images/Turkville_haber.png', // diğer için haber kullanılıyor
-  'HAP_BILGI': '/images/Turkville_hap_bilgi.png',
-  'KULTUR': '/images/Turkville_magazin.png', // kültür için magazin kullanılıyor
-  'SPOR': '/images/Turkville_spor.png',
-  'TEKNOLOJI': '/images/Turkville_teknoloji.png',
-  'SAGLIK': '/images/Turkville_saglik.png',
-  'EGITIM': '/images/Turkville_egitim.png',
-  'CEVRE': '/images/Turkville_yasam.png', // çevre için yaşam kullanılıyor
-  'EMLAK': '/images/Turkville_emlak.png',
-  'OTOMOTIV': '/images/Turkville_alisveris.png', // otomotiv için alışveriş kullanılıyor
-  'YEME_ICME': '/images/Turkville_yasam.png', // yeme içme için yaşam kullanılıyor
-  'SEYAHAT': '/images/Turkville_seyahat.png',
-  'YASAM': '/images/Turkville_yasam.png'
-}
-
-// Kategori Etiketleri (Türkçe gösterim)
-const CATEGORY_LABELS = {
-  'CEVRE': 'Çevre',
-  'DENEY': 'Deney',
-  'DIGER': 'Diğer',
-  'EGITIM': 'Eğitim',
-  'EKONOMI': 'Ekonomi',
-  'EMLAK': 'Emlak',
-  'ETKINLIK': 'Etkinlik',
-  'GOCMENLIK': 'Göçmenlik',
-  'GUNDEM': 'Gündem',
-  'GUVENLIK': 'Güvenlik',
-  'HAP_BILGI': 'Hap Bilgi',
-  'HAVA': 'Hava',
-  'IS_ILANI': 'İş İlanı',
-  'KULTUR': 'Kültür',
-  'OTOMOTIV': 'Otomotiv',
-  'SAGLIK': 'Sağlık',
-  'SEYAHAT': 'Seyahat',
-  'SPOR': 'Spor',
-  'TEKNOLOJI': 'Teknoloji',
-  'YASAM': 'Yaşam',
-  'YEME_ICME': 'Yeme İçme'
-}
-
 export default function Dashboard() {
   const router = useRouter()
   const [news, setNews] = useState([])
@@ -97,6 +47,23 @@ export default function Dashboard() {
   // Lightbox for image preview
   const [showLightbox, setShowLightbox] = useState(false)
   const [lightboxImage, setLightboxImage] = useState(null)
+
+  // Kategoriler (DB'den)
+  const [categories, setCategories] = useState([])
+
+  // Kategorileri DB'den çek
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await fetch('/api/categories')
+        const data = await response.json()
+        setCategories(data.categories || [])
+      } catch (error) {
+        console.error('fetchCategories error:', error)
+      }
+    }
+    fetchCategories()
+  }, [])
 
   useEffect(() => {
     fetchNews()
@@ -688,32 +655,9 @@ ${selectedNews.content_snippet ? `Detay: ${selectedNews.content_snippet}` : ''}
     return 'bg-red-100 text-red-800'
   }
 
-  const getCategoryEmoji = (category) => {
-    const emojis = {
-      'CEVRE': '🌿',
-      'DENEY': '🧪',
-      'DIGER': '📌',
-      'EGITIM': '📚',
-      'EKONOMI': '💰',
-      'EMLAK': '🏠',
-      'ETKINLIK': '🎉',
-      'GOCMENLIK': '🇨🇦',
-      'GUNDEM': '📰',
-      'GUVENLIK': '🚨',
-      'HAP_BILGI': '💊',
-      'HAVA': '🌤️',
-      'IS_ILANI': '💼',
-      'KULTUR': '🎭',
-      'OTOMOTIV': '🚗',
-      'SAGLIK': '🏥',
-      'SEYAHAT': '✈️',
-      'SPOR': '⚽',
-      'TEKNOLOJI': '💻',
-      'YASAM': '🌟',
-      'YEME_ICME': '🍽️'
-    }
-    return emojis[category] || '📌'
-  }
+  // getCategoryEmoji artık kullanılmıyor - badge görseli kullanılıyor
+  // Eski sistemle uyumluluk için basit bir fallback
+  const getCategoryEmoji = (category) => '📰'
 
   const getStatusBadge = (status) => {
     const styles = {
@@ -726,7 +670,16 @@ ${selectedNews.content_snippet ? `Detay: ${selectedNews.content_snippet}` : ''}
     return styles[status] || 'bg-gray-100 text-gray-800'
   }
 
-  const categories = ['CEVRE', 'DENEY', 'DIGER', 'EGITIM', 'EKONOMI', 'EMLAK', 'ETKINLIK', 'GOCMENLIK', 'GUNDEM', 'GUVENLIK', 'HAP_BILGI', 'HAVA', 'IS_ILANI', 'KULTUR', 'OTOMOTIV', 'SAGLIK', 'SEYAHAT', 'SPOR', 'TEKNOLOJI', 'YASAM', 'YEME_ICME']
+  // Kategori label ve badge helper fonksiyonları
+  const getCategoryLabel = (key) => {
+    const cat = categories.find(c => c.key === key)
+    return cat?.label_tr || key
+  }
+
+  const getCategoryBadge = (key) => {
+    const cat = categories.find(c => c.key === key)
+    return cat?.badge_path || '/images/turkvillelogo.png'
+  }
 
   return (
     <>
@@ -750,6 +703,12 @@ ${selectedNews.content_snippet ? `Detay: ${selectedNews.content_snippet}` : ''}
                 </div>
               </div>
               <div className="flex items-center gap-3">
+                <button
+                  onClick={() => router.push('/categories')}
+                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center gap-2 font-medium"
+                >
+                  📁 Kategoriler
+                </button>
                 <button
                   onClick={() => setShowImageGenerator(true)}
                   className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 flex items-center gap-2 font-medium shadow-sm"
@@ -819,7 +778,7 @@ ${selectedNews.content_snippet ? `Detay: ${selectedNews.content_snippet}` : ''}
                 >
                   <option value="all">Tüm Kategoriler</option>
                   {categories.map(cat => (
-                    <option key={cat} value={cat}>{getCategoryEmoji(cat)} {CATEGORY_LABELS[cat] || cat}</option>
+                    <option key={cat.key} value={cat.key}>{cat.label_tr}</option>
                   ))}
                 </select>
               </div>
