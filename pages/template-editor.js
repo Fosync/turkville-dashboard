@@ -47,6 +47,24 @@ const BG_COLORS = [
   { name: 'Lacivert', value: '#1e3a5f' }
 ]
 
+// Gradient presets
+const GRADIENT_PRESETS = [
+  { name: 'Koyu', startColor: 'rgba(0,0,0,0.9)', endColor: 'rgba(0,0,0,0)', direction: 'to top' },
+  { name: 'Mavi', startColor: 'rgba(30,58,138,0.9)', endColor: 'rgba(30,58,138,0)', direction: 'to top' },
+  { name: 'Kırmızı', startColor: 'rgba(185,28,28,0.9)', endColor: 'rgba(185,28,28,0)', direction: 'to top' },
+  { name: 'Yeşil', startColor: 'rgba(22,101,52,0.9)', endColor: 'rgba(22,101,52,0)', direction: 'to top' },
+  { name: 'Mor', startColor: 'rgba(88,28,135,0.9)', endColor: 'rgba(88,28,135,0)', direction: 'to top' }
+]
+
+const GRADIENT_DIRECTIONS = [
+  { name: 'Yukarı', value: 'to top' },
+  { name: 'Aşağı', value: 'to bottom' },
+  { name: 'Sola', value: 'to left' },
+  { name: 'Sağa', value: 'to right' },
+  { name: 'Çapraz ↗', value: 'to top right' },
+  { name: 'Çapraz ↖', value: 'to top left' }
+]
+
 export default function TemplateEditor() {
   // Canvas state
   const [canvasWidth, setCanvasWidth] = useState(1080)
@@ -55,6 +73,8 @@ export default function TemplateEditor() {
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 })
   const [isPanning, setIsPanning] = useState(false)
   const [spacePressed, setSpacePressed] = useState(false)
+  const [shiftPressed, setShiftPressed] = useState(false)
+  const [dragStartPos, setDragStartPos] = useState(null) // Shift ile eksen kilitleme için
 
   // Selection & editing
   const [selectedIds, setSelectedIds] = useState([])
@@ -110,10 +130,12 @@ export default function TemplateEditor() {
 
   // Elements
   const getVisualElements = () => [
-    { id: 'gradient', type: 'overlay', name: '[FX] Gradient', src: '/images/backgroundlinear.png',
-      x: 0, y: 0, width: canvasWidth, height: canvasHeight, zIndex: 2, opacity: 85, locked: false, visible: true, rotation: 0 },
+    { id: 'gradient', type: 'gradient', name: '[FX] Gradient',
+      x: 0, y: 0, width: canvasWidth, height: canvasHeight, zIndex: 2, opacity: 85,
+      locked: false, visible: true, rotation: 0,
+      gradientStart: 'rgba(0,0,0,0.9)', gradientEnd: 'rgba(0,0,0,0)', gradientDirection: 'to top' },
     { id: 'badge', type: 'image', name: '[UI] Etiket', src: '/images/turkvilleEtkinlik.png',
-      x: 30, y: 30, width: 180, height: 60, zIndex: 10, opacity: 100, locked: false, visible: true, rotation: 0, objectFit: 'contain' },
+      x: 30, y: 30, width: 180, height: 60, zIndex: 10, opacity: 100, locked: true, visible: true, rotation: 0, objectFit: 'contain' },
     { id: 'title', type: 'text', name: '[TXT] Başlık', text: 'ÖRNEK ETKİNLİK BAŞLIĞI',
       x: 30, y: canvasHeight - 250, width: canvasWidth - 60, height: 150, zIndex: 11, opacity: 100,
       fontSize: 52, fontWeight: 800, fontFamily: "'Gilroy', sans-serif", color: '#FFFFFF',
@@ -121,14 +143,14 @@ export default function TemplateEditor() {
       locked: false, visible: true, rotation: 0, shadow: true },
     { id: 'banner', type: 'image', name: '[UI] Banner', src: '/images/banner.png',
       x: 0, y: canvasHeight - 100, width: canvasWidth, height: 100, zIndex: 12,
-      opacity: 100, locked: false, visible: true, rotation: 0, objectFit: 'contain' }
+      opacity: 100, locked: true, visible: true, rotation: 0, objectFit: 'contain' }
   ]
 
   const getTextElements = () => [
     { id: 'colorBg', type: 'color', name: '[BG] Renk', color: bgColor,
-      x: 0, y: 0, width: canvasWidth, height: canvasHeight, zIndex: 1, opacity: 100, locked: false, visible: true },
+      x: 0, y: 0, width: canvasWidth, height: canvasHeight, zIndex: 1, opacity: 100, locked: true, visible: true },
     { id: 'badge', type: 'image', name: '[UI] Etiket', src: '/images/turkvilleEtkinlik.png',
-      x: 30, y: 30, width: 180, height: 60, zIndex: 10, opacity: 100, locked: false, visible: true, rotation: 0, objectFit: 'contain' },
+      x: 30, y: 30, width: 180, height: 60, zIndex: 10, opacity: 100, locked: true, visible: true, rotation: 0, objectFit: 'contain' },
     { id: 'title', type: 'text', name: '[TXT] İçerik', text: 'UZUN METİN HABERİ',
       x: 30, y: 150, width: canvasWidth - 60, height: canvasHeight - 300, zIndex: 11, opacity: 100,
       fontSize: 48, fontWeight: 700, fontFamily: "'Gilroy', sans-serif", color: '#FFFFFF',
@@ -136,7 +158,7 @@ export default function TemplateEditor() {
       locked: false, visible: true, rotation: 0, shadow: false },
     { id: 'banner', type: 'image', name: '[UI] Banner', src: '/images/banner.png',
       x: 0, y: canvasHeight - 100, width: canvasWidth, height: 100, zIndex: 12,
-      opacity: 100, locked: false, visible: true, rotation: 0, objectFit: 'contain' }
+      opacity: 100, locked: true, visible: true, rotation: 0, objectFit: 'contain' }
   ]
 
   const [elements, setElements] = useState(() => getVisualElements())
@@ -358,6 +380,11 @@ export default function TemplateEditor() {
   // Keyboard events
   useEffect(() => {
     const handleKeyDown = (e) => {
+      // Shift for axis lock
+      if (e.shiftKey) {
+        setShiftPressed(true)
+      }
+
       // Space for pan mode
       if (e.code === 'Space' && !editingTextId) {
         e.preventDefault()
@@ -420,6 +447,10 @@ export default function TemplateEditor() {
 
     const handleKeyUp = (e) => {
       if (e.code === 'Space') setSpacePressed(false)
+      if (!e.shiftKey) {
+        setShiftPressed(false)
+        setDragStartPos(null) // Reset drag start when shift released
+      }
     }
 
     window.addEventListener('keydown', handleKeyDown)
@@ -678,6 +709,14 @@ export default function TemplateEditor() {
     if (el.type === 'color') {
       return <div className="w-full h-full" style={{ backgroundColor: el.color, opacity: el.opacity / 100 }} />
     }
+    if (el.type === 'gradient') {
+      return (
+        <div className="w-full h-full pointer-events-none" style={{
+          background: `linear-gradient(${el.gradientDirection || 'to top'}, ${el.gradientStart || 'rgba(0,0,0,0.9)'}, ${el.gradientEnd || 'rgba(0,0,0,0)'})`,
+          opacity: el.opacity / 100
+        }} />
+      )
+    }
     if (el.type === 'overlay') {
       return <img src={el.src} alt="" className="w-full h-full object-cover pointer-events-none" style={{ opacity: el.opacity / 100 }} />
     }
@@ -730,7 +769,10 @@ export default function TemplateEditor() {
               letterSpacing: el.letterSpacing || 0,
               textAlign: el.textAlign,
               textTransform: el.textTransform || 'none',
-              textShadow: el.shadow ? '2px 2px 8px rgba(0,0,0,0.9)' : 'none'
+              textShadow: el.shadow ? '2px 2px 8px rgba(0,0,0,0.9)' : 'none',
+              wordWrap: 'break-word',
+              overflowWrap: 'break-word',
+              whiteSpace: 'pre-wrap'
             }}
             onBlur={(e) => { updateElement(el.id, { text: e.target.value }); setEditingTextId(null) }}
             onClick={(e) => e.stopPropagation()}
@@ -749,7 +791,11 @@ export default function TemplateEditor() {
           letterSpacing: el.letterSpacing || 0,
           textAlign: el.textAlign,
           textTransform: el.textTransform || 'none',
-          textShadow: el.shadow ? '2px 2px 8px rgba(0,0,0,0.9)' : 'none'
+          textShadow: el.shadow ? '2px 2px 8px rgba(0,0,0,0.9)' : 'none',
+          wordWrap: 'break-word',
+          overflowWrap: 'break-word',
+          whiteSpace: 'pre-wrap',
+          overflow: 'hidden'
         }}>
           {el.text}
         </div>
@@ -978,6 +1024,10 @@ export default function TemplateEditor() {
                   <Rnd key={el.id}
                     size={{ width: el.width * scale, height: el.height * scale }}
                     position={{ x: el.x * scale, y: el.y * scale }}
+                    onDragStart={(e, d) => {
+                      // Save start position for shift axis lock
+                      setDragStartPos({ x: d.x, y: d.y })
+                    }}
                     onDrag={(e, d) => {
                       const centerX = d.x / scale + el.width / 2
                       const centerY = d.y / scale + el.height / 2
@@ -989,6 +1039,20 @@ export default function TemplateEditor() {
                     onDragStop={(e, d) => {
                       if (el.locked) return
                       let x = d.x / scale, y = d.y / scale
+
+                      // Shift ile eksen kilitleme
+                      if (shiftPressed && dragStartPos) {
+                        const deltaX = Math.abs(d.x - dragStartPos.x)
+                        const deltaY = Math.abs(d.y - dragStartPos.y)
+                        if (deltaX > deltaY) {
+                          // X ekseni kilitli - sadece yatay hareket
+                          y = el.y
+                        } else {
+                          // Y ekseni kilitli - sadece dikey hareket
+                          x = el.x
+                        }
+                      }
+
                       if (snapToGrid) { x = Math.round(x / 10) * 10; y = Math.round(y / 10) * 10 }
                       const centerX = x + el.width / 2
                       const centerY = y + el.height / 2
@@ -996,6 +1060,7 @@ export default function TemplateEditor() {
                       if (Math.abs(centerY - canvasHeight / 2) < 10) y = (canvasHeight - el.height) / 2
                       updateElement(el.id, { x, y })
                       setSmartGuides({ x: null, y: null })
+                      setDragStartPos(null)
                     }}
                     onResizeStop={(e, dir, ref, delta, pos) => {
                       if (el.locked) return
@@ -1061,6 +1126,91 @@ export default function TemplateEditor() {
                     <label className="text-gray-400">Renk</label>
                     <input type="color" value={selectedElement.color} onChange={(e) => updateElement(selectedId, { color: e.target.value })}
                       className="w-full h-8 bg-[#1a1a2e] rounded cursor-pointer border border-gray-700" />
+                  </div>
+                )}
+
+                {/* Gradient element */}
+                {selectedElement.type === 'gradient' && (
+                  <div className="space-y-2">
+                    <div className="text-gray-500 font-semibold">GRADİENT AYARLARI</div>
+
+                    {/* Preset buttons */}
+                    <div>
+                      <label className="text-gray-400 text-[10px]">Hazır Şablonlar</label>
+                      <div className="flex gap-1 flex-wrap mt-1">
+                        {GRADIENT_PRESETS.map(preset => (
+                          <button key={preset.name}
+                            onClick={() => updateElement(selectedId, {
+                              gradientStart: preset.startColor,
+                              gradientEnd: preset.endColor,
+                              gradientDirection: preset.direction
+                            })}
+                            className="px-2 py-1 rounded text-[10px] hover:ring-1 ring-white"
+                            style={{ background: `linear-gradient(${preset.direction}, ${preset.startColor}, ${preset.endColor})` }}>
+                            {preset.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Direction */}
+                    <div>
+                      <label className="text-gray-400 text-[10px]">Yön</label>
+                      <select value={selectedElement.gradientDirection || 'to top'}
+                        onChange={(e) => updateElement(selectedId, { gradientDirection: e.target.value })}
+                        className="w-full px-1 py-0.5 bg-[#1a1a2e] rounded border border-gray-700 mt-1">
+                        {GRADIENT_DIRECTIONS.map(dir => (
+                          <option key={dir.value} value={dir.value}>{dir.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Start Color */}
+                    <div>
+                      <label className="text-gray-400 text-[10px]">Başlangıç Rengi</label>
+                      <div className="flex gap-1 mt-1">
+                        <input type="color"
+                          value={selectedElement.gradientStart?.replace(/rgba?\([\d,.\s]+\)/, '#000000') || '#000000'}
+                          onChange={(e) => {
+                            const hex = e.target.value
+                            const r = parseInt(hex.slice(1,3), 16)
+                            const g = parseInt(hex.slice(3,5), 16)
+                            const b = parseInt(hex.slice(5,7), 16)
+                            updateElement(selectedId, { gradientStart: `rgba(${r},${g},${b},0.9)` })
+                          }}
+                          className="w-10 h-6 rounded cursor-pointer border border-gray-700" />
+                        <input type="text" value={selectedElement.gradientStart || 'rgba(0,0,0,0.9)'}
+                          onChange={(e) => updateElement(selectedId, { gradientStart: e.target.value })}
+                          className="flex-1 px-1 py-0.5 bg-[#1a1a2e] rounded border border-gray-700 text-[10px]" />
+                      </div>
+                    </div>
+
+                    {/* End Color */}
+                    <div>
+                      <label className="text-gray-400 text-[10px]">Bitiş Rengi</label>
+                      <div className="flex gap-1 mt-1">
+                        <input type="color"
+                          value={selectedElement.gradientEnd?.replace(/rgba?\([\d,.\s]+\)/, '#000000') || '#000000'}
+                          onChange={(e) => {
+                            const hex = e.target.value
+                            const r = parseInt(hex.slice(1,3), 16)
+                            const g = parseInt(hex.slice(3,5), 16)
+                            const b = parseInt(hex.slice(5,7), 16)
+                            updateElement(selectedId, { gradientEnd: `rgba(${r},${g},${b},0)` })
+                          }}
+                          className="w-10 h-6 rounded cursor-pointer border border-gray-700" />
+                        <input type="text" value={selectedElement.gradientEnd || 'rgba(0,0,0,0)'}
+                          onChange={(e) => updateElement(selectedId, { gradientEnd: e.target.value })}
+                          className="flex-1 px-1 py-0.5 bg-[#1a1a2e] rounded border border-gray-700 text-[10px]" />
+                      </div>
+                    </div>
+
+                    {/* Preview */}
+                    <div>
+                      <label className="text-gray-400 text-[10px]">Önizleme</label>
+                      <div className="w-full h-12 rounded mt-1"
+                        style={{ background: `linear-gradient(${selectedElement.gradientDirection || 'to top'}, ${selectedElement.gradientStart || 'rgba(0,0,0,0.9)'}, ${selectedElement.gradientEnd || 'rgba(0,0,0,0)'})` }} />
+                    </div>
                   </div>
                 )}
 
@@ -1187,7 +1337,14 @@ export default function TemplateEditor() {
                   </>
                 )}
 
-                <button onClick={() => deleteElement(selectedId)} className="w-full py-1.5 bg-red-600/20 text-red-400 rounded hover:bg-red-600 hover:text-white mt-2">🗑️ Sil</button>
+                {/* Lock/Unlock button */}
+                <button
+                  onClick={() => updateElement(selectedId, { locked: !selectedElement.locked })}
+                  className={`w-full py-1.5 rounded mt-2 ${selectedElement.locked ? 'bg-yellow-600/20 text-yellow-400 hover:bg-yellow-600 hover:text-white' : 'bg-gray-600/20 text-gray-400 hover:bg-gray-600 hover:text-white'}`}>
+                  {selectedElement.locked ? '🔒 Kilitli - Kilidi Aç' : '🔓 Kilitle'}
+                </button>
+
+                <button onClick={() => deleteElement(selectedId)} className="w-full py-1.5 bg-red-600/20 text-red-400 rounded hover:bg-red-600 hover:text-white mt-1">🗑️ Sil</button>
               </div>
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center text-gray-500 p-4">
@@ -1197,6 +1354,7 @@ export default function TemplateEditor() {
                   <p>Ctrl+Z/Y: Geri/İleri</p>
                   <p>Space+Drag: Pan</p>
                   <p>Ctrl+Scroll: Zoom</p>
+                  <p>Shift+Drag: Eksen Kilitle</p>
                   <p>Sağ Tık: Menü</p>
                 </div>
               </div>

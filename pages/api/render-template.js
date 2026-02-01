@@ -20,7 +20,12 @@ export default async function handler(req, res) {
     // n8n data binding
     data = {},
     // Opsiyonel element override
-    elements = null
+    elements = null,
+    // Gradient options
+    gradientStart = 'rgba(0,0,0,0.9)',
+    gradientEnd = 'rgba(0,0,0,0)',
+    gradientDirection = 'to top',
+    gradientOpacity = 85
   } = req.body
 
   // Quality settings
@@ -198,7 +203,8 @@ export default async function handler(req, res) {
 
     .gradient-overlay {
       position: absolute; top: 0; left: 0; width: 1080px; height: 1350px;
-      object-fit: cover; z-index: 2; opacity: 0.7;
+      z-index: 2; opacity: ${gradientOpacity / 100};
+      background: linear-gradient(${gradientDirection}, ${gradientStart}, ${gradientEnd});
     }
 
     .event-badge {
@@ -228,7 +234,7 @@ export default async function handler(req, res) {
 <body>
   <div class="container">
     <img src="${backgroundBase64}" class="background" onerror="this.style.display='none'">
-    <img src="${gradientBase64}" class="gradient-overlay">
+    <div class="gradient-overlay"></div>
     <img src="${badgeBase64}" class="event-badge">
     <div class="title-container">
       <h1 class="title">${escapeHtml(finalTitle)}</h1>
