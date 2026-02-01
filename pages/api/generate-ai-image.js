@@ -1,38 +1,34 @@
-// Imagen 3 via Gemini API - AI Image Generation
+// Imagen 4 AI Image Generation
 import { createClient } from '@supabase/supabase-js'
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
 // Kategori bazlı stil ekleri
 const CATEGORY_STYLES = {
-  'GOCMENLIK': 'passport, airport terminal, immigration office, travel documents, diverse people',
-  'EKONOMI': 'financial charts, stock market, money, business district, modern office',
-  'GUNDEM': 'parliament building, city hall, urban landscape, news setting, political',
-  'HAVA': 'weather conditions, dramatic sky, atmospheric, meteorological',
-  'GUVENLIK': 'police, security, safety equipment, protection, emergency services',
-  'ETKINLIK': 'community event, celebration, festival, gathering, concert venue',
-  'IS_ILANI': 'job interview, office workspace, career, professional setting',
-  'DENEY': 'laboratory, science, research, experimental, innovation',
-  'DIGER': 'news illustration, editorial, informative'
+  'GOCMENLIK': 'passport, airport terminal, immigration documents, Canadian flag, travel',
+  'EKONOMI': 'financial charts, Canadian dollar, business district, stock market, Toronto skyline',
+  'GUNDEM': 'Canadian parliament building, politics, Ottawa, cityscape, government',
+  'HAVA': 'weather scene, dramatic sky, Toronto skyline, Canadian landscape',
+  'GUVENLIK': 'police lights, security, urban safety, Canadian police, emergency',
+  'ETKINLIK': 'community event, celebration, festival, concert, gathering, party',
+  'IS_ILANI': 'modern office, workplace, job interview, professional setting, career',
+  'DENEY': 'laboratory, science, research, innovation, technology',
+  'DIGER': 'Toronto cityscape, Canada landscape, urban, modern'
 }
 
-// Türkçe-İngilizce basit çeviri
+// Türkçe-İngilizce çeviri tablosu
 const TRANSLATIONS = {
   'kanada': 'Canada', 'toronto': 'Toronto', 'türk': 'Turkish', 'türkiye': 'Turkey',
-  'haber': 'news', 'etkinlik': 'event', 'festival': 'festival', 'konser': 'concert',
-  'toplantı': 'meeting', 'kutlama': 'celebration', 'parti': 'party',
-  'ekonomi': 'economy', 'iş': 'business', 'para': 'money', 'dolar': 'dollar',
-  'göçmenlik': 'immigration', 'vize': 'visa', 'pasaport': 'passport',
-  'hava': 'weather', 'kar': 'snow', 'yağmur': 'rain', 'güneş': 'sunny',
-  'polis': 'police', 'güvenlik': 'security', 'acil': 'emergency',
-  'seçim': 'election', 'hükümet': 'government', 'politika': 'politics',
-  'okul': 'school', 'eğitim': 'education', 'üniversite': 'university',
-  'sağlık': 'health', 'hastane': 'hospital', 'doktor': 'doctor',
-  'spor': 'sports', 'futbol': 'soccer', 'basketbol': 'basketball',
-  'müzik': 'music', 'sanat': 'art', 'kültür': 'culture',
-  'yemek': 'food', 'restoran': 'restaurant', 'lezzet': 'cuisine'
+  'göçmenlik': 'immigration', 'vize': 'visa', 'pasaport': 'passport', 'vatandaşlık': 'citizenship',
+  'ekonomi': 'economy', 'dolar': 'dollar', 'borsa': 'stock market', 'enflasyon': 'inflation',
+  'haber': 'news', 'seçim': 'election', 'hükümet': 'government', 'politika': 'politics',
+  'hava': 'weather', 'kar': 'snow', 'yağmur': 'rain', 'fırtına': 'storm', 'güneş': 'sunny',
+  'polis': 'police', 'güvenlik': 'security', 'acil': 'emergency', 'kaza': 'accident',
+  'etkinlik': 'event', 'festival': 'festival', 'konser': 'concert', 'kutlama': 'celebration',
+  'toplantı': 'meeting', 'parti': 'party', 'topluluk': 'community',
+  'iş': 'job', 'çalışma': 'work', 'kariyer': 'career', 'maaş': 'salary'
 }
 
 function translateToEnglish(text) {
@@ -43,10 +39,13 @@ function translateToEnglish(text) {
   result = result
     .replace(/ğ/g, 'g').replace(/ü/g, 'u').replace(/ş/g, 's')
     .replace(/ı/g, 'i').replace(/ö/g, 'o').replace(/ç/g, 'c')
+    .replace(/Ğ/g, 'G').replace(/Ü/g, 'U').replace(/Ş/g, 'S')
+    .replace(/İ/g, 'I').replace(/Ö/g, 'O').replace(/Ç/g, 'C')
 
   // Bilinen kelimeleri çevir
   for (const [tr, en] of Object.entries(TRANSLATIONS)) {
-    const regex = new RegExp(tr.replace(/ğ/g, 'g').replace(/ü/g, 'u').replace(/ş/g, 's').replace(/ı/g, 'i').replace(/ö/g, 'o').replace(/ç/g, 'c'), 'gi')
+    const normalizedTr = tr.replace(/ğ/g, 'g').replace(/ü/g, 'u').replace(/ş/g, 's').replace(/ı/g, 'i').replace(/ö/g, 'o').replace(/ç/g, 'c')
+    const regex = new RegExp(`\\b${normalizedTr}\\b`, 'gi')
     result = result.replace(regex, en)
   }
 
@@ -63,8 +62,8 @@ function generatePrompt(news) {
   // Kategori stilini al
   const categoryStyle = CATEGORY_STYLES[category] || CATEGORY_STYLES['DIGER']
 
-  // Ana prompt oluştur
-  const prompt = `Professional editorial illustration for Instagram news post. Topic: ${englishTitle}. ${englishSummary ? `Context: ${englishSummary}.` : ''} Visual elements: ${categoryStyle}. Style: modern, clean, professional photography or illustration, high quality, vibrant colors, editorial magazine quality. Requirements: No text overlay, no watermark, no logos, no written words in the image. Square format, Instagram-ready composition.`
+  // Prompt oluştur
+  const prompt = `Professional editorial illustration for Instagram news post. Topic: ${englishTitle}. ${englishSummary ? `Context: ${englishSummary}.` : ''} Visual elements: ${categoryStyle}. Style: modern, clean, photojournalistic, high quality, 4K resolution, vibrant colors. Requirements: No text overlay, no watermark, no logos, no writing on image, no letters, no words.`
 
   return prompt
 }
@@ -85,7 +84,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'News data with id is required' })
   }
 
-  console.log('=== IMAGEN 3 GENERATION START ===')
+  console.log('=== IMAGEN 4 GENERATION START ===')
   console.log('News ID:', news.id)
   console.log('Title:', news.title_tr)
   console.log('Category:', news.category)
@@ -95,14 +94,15 @@ export default async function handler(req, res) {
     const prompt = generatePrompt(news)
     console.log('Generated prompt:', prompt)
 
-    // 2. Imagen 3 API çağrısı
-    console.log('Calling Imagen 3 API...')
+    // 2. Imagen 4 API çağrısı
+    console.log('Calling Imagen 4 API...')
     const imagenResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${GEMINI_API_KEY}`,
+      'https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict',
       {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'x-goog-api-key': GEMINI_API_KEY
         },
         body: JSON.stringify({
           instances: [{ prompt }],
@@ -116,23 +116,24 @@ export default async function handler(req, res) {
 
     if (!imagenResponse.ok) {
       const errorText = await imagenResponse.text()
-      console.error('Imagen API error:', errorText)
-      throw new Error(`Imagen API error: ${imagenResponse.status} - ${errorText}`)
+      console.error('Imagen 4 API error:', imagenResponse.status, errorText)
+      throw new Error(`Imagen 4 API error: ${imagenResponse.status}`)
     }
 
     const imagenData = await imagenResponse.json()
-    console.log('Imagen response received')
+    console.log('Imagen 4 response received')
 
     // Base64 image'ı al
     const base64Image = imagenData.predictions?.[0]?.bytesBase64Encoded
     if (!base64Image) {
+      console.error('No image in response:', JSON.stringify(imagenData))
       throw new Error('No image data in response')
     }
 
     console.log('Image generated, size:', base64Image.length)
 
     // 3. Supabase Storage'a yükle
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+    const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
 
     // Base64'ü buffer'a çevir
     const buffer = Buffer.from(base64Image, 'base64')
@@ -144,7 +145,7 @@ export default async function handler(req, res) {
     await supabase.storage.from('news-images').remove([fileName])
 
     // Yeni dosyayı yükle
-    const { data: uploadData, error: uploadError } = await supabase.storage
+    const { error: uploadError } = await supabase.storage
       .from('news-images')
       .upload(fileName, buffer, {
         contentType: 'image/png',
@@ -171,11 +172,11 @@ export default async function handler(req, res) {
       .eq('id', news.id)
 
     if (updateError) {
-      console.error('Update error:', updateError)
+      console.error('DB update error:', updateError)
       // Görsel yüklendi ama DB güncellenemedi - yine de URL'i döndür
     }
 
-    console.log('=== IMAGEN 3 GENERATION SUCCESS ===')
+    console.log('=== IMAGEN 4 GENERATION SUCCESS ===')
 
     return res.status(200).json({
       success: true,
@@ -185,8 +186,8 @@ export default async function handler(req, res) {
     })
 
   } catch (error) {
-    console.error('=== IMAGEN 3 GENERATION ERROR ===')
-    console.error(error)
+    console.error('=== IMAGEN 4 GENERATION ERROR ===')
+    console.error(error.message)
 
     return res.status(500).json({
       error: error.message,
@@ -199,6 +200,7 @@ export const config = {
   api: {
     bodyParser: {
       sizeLimit: '10mb'
-    }
+    },
+    responseLimit: '10mb'
   }
 }
