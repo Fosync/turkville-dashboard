@@ -1135,13 +1135,23 @@ ${selectedNews.content_snippet ? `Detay: ${selectedNews.content_snippet}` : ''}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <a
-                      href="/template-editor"
-                      target="_blank"
+                    <button
+                      onClick={() => {
+                        // Verileri localStorage'a kaydet ve editöre git
+                        const editorData = {
+                          backgroundUrl: selectedBgForPost || newsImages.find(img => img.is_selected)?.image_url || newsImages[0]?.image_url,
+                          title: instagramSummary || selectedNews.instagram_summary || selectedNews.title_tr,
+                          slide2Text: instagramDetailed || selectedNews.instagram_detailed,
+                          newsId: selectedNews.id,
+                          mode: 'visual'
+                        }
+                        localStorage.setItem('editorData', JSON.stringify(editorData))
+                        window.open('/template-editor', '_blank')
+                      }}
                       className="px-3 py-1.5 bg-indigo-100 text-indigo-700 rounded-lg text-sm font-medium hover:bg-indigo-200 flex items-center gap-1"
                     >
                       🎨 Tasarim Editoru
-                    </a>
+                    </button>
                     <button
                       onClick={() => setShowPostGenerator(false)}
                       className="text-gray-400 hover:text-gray-600 text-2xl"

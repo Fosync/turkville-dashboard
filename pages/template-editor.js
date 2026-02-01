@@ -157,8 +157,41 @@ export default function TemplateEditor() {
     if (savedBg) {
       setBackgroundUrl(savedBg)
       setTemplateMode('visual')
-      // Temizle - bir kere kullanıldıktan sonra
       localStorage.removeItem('backgroundImage')
+    }
+  }, [])
+
+  // Load editor data from carousel modal
+  useEffect(() => {
+    const editorDataStr = localStorage.getItem('editorData')
+    if (editorDataStr) {
+      try {
+        const editorData = JSON.parse(editorDataStr)
+        console.log('Loading editor data:', editorData)
+
+        // Arka plan görselini ayarla
+        if (editorData.backgroundUrl) {
+          setBackgroundUrl(editorData.backgroundUrl)
+        }
+
+        // Mode ayarla
+        if (editorData.mode) {
+          setTemplateMode(editorData.mode)
+        }
+
+        // Başlık metnini güncelle
+        if (editorData.title) {
+          setElements(prev => prev.map(el =>
+            el.id === 'title' ? { ...el, text: editorData.title } : el
+          ))
+        }
+
+        // Temizle - bir kere kullanıldıktan sonra
+        localStorage.removeItem('editorData')
+      } catch (e) {
+        console.error('Error parsing editorData:', e)
+        localStorage.removeItem('editorData')
+      }
     }
   }, [])
 
