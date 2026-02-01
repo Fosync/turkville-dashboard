@@ -8,10 +8,14 @@
     "start": "next start"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
+    "google-auth-library": "^10.5.0",
     "next": "14.0.4",
+    "puppeteer": "^24.36.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "@supabase/supabase-js": "^2.39.0"
+    "react-rnd": "^10.5.2",
+    "sharp": "^0.34.5"
   },
   "devDependencies": {
     "autoprefixer": "^10.4.16",

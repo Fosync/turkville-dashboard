@@ -1,8 +1,12 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import Head from 'next/head'
+import { useRouter } from 'next/router'
+
+const GEMINI_API_KEY = 'AIzaSyB5w3fvek5gkxhcZIe_5r8XKtgQHKz8Nws'
 
 export default function Dashboard() {
+  const router = useRouter()
   const [news, setNews] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedNews, setSelectedNews] = useState(null)
@@ -10,9 +14,35 @@ export default function Dashboard() {
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [stats, setStats] = useState({ total: 0, high: 0, medium: 0, low: 0 })
 
+  // Instagram Post Generator State
+  const [showPostGenerator, setShowPostGenerator] = useState(false)
+  const [showQuickPostModal, setShowQuickPostModal] = useState(false)
+  const [postPrompt, setPostPrompt] = useState('')
+  const [generatedImageUrl, setGeneratedImageUrl] = useState(null)
+  const [isGeneratingPrompt, setIsGeneratingPrompt] = useState(false)
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [etkinlikNews, setEtkinlikNews] = useState([])
+
   useEffect(() => {
     fetchNews()
   }, [filter, categoryFilter])
+
+  // ETKINLIK haberlerini yükle (Quick Post Modal için)
+  useEffect(() => {
+    const fetchEtkinlikNews = async () => {
+      const { data } = await supabase
+        .from('news_items')
+        .select('*')
+        .eq('category', 'ETKINLIK')
+        .order('created_at', { ascending: false })
+        .limit(20)
+      setEtkinlikNews(data || [])
+    }
+    if (showQuickPostModal) {
+      fetchEtkinlikNews()
+    }
+  }, [showQuickPostModal])
 
   const fetchNews = async () => {
     setLoading(true)
@@ -52,7 +82,7 @@ export default function Dashboard() {
       .from('news_items')
       .update({ status: newStatus })
       .eq('id', id)
-    
+
     if (error) {
       alert('Hata: ' + error.message)
     } else {
@@ -61,6 +91,182 @@ export default function Dashboard() {
         setSelectedNews({ ...selectedNews, status: newStatus })
       }
     }
+  }
+
+  // Gemini API ile prompt önerisi al
+  const generatePromptWithAI = async () => {
+    if (!selectedNews) return
+    setIsGeneratingPrompt(true)
+
+    try {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{
+              parts: [{
+                text: `Sen bir Instagram post tasarımcısısın. Aşağıdaki etkinlik haberi için arka plan görseli oluşturmak üzere bir görsel prompt yaz. Prompt İngilizce olmalı, detaylı ve görsel olarak çekici bir sahne tanımlamalı. Sadece prompt'u yaz, başka bir şey yazma.
+
+Etkinlik Başlığı: ${selectedNews.title_tr}
+${selectedNews.content_snippet ? `Detay: ${selectedNews.content_snippet}` : ''}
+
+Örnek format: "A vibrant festival scene with colorful decorations, warm lighting, happy crowd silhouettes, bokeh lights in background, festive atmosphere"`
+              }]
+            }]
+          })
+        }
+      )
+
+      const data = await response.json()
+      const generatedPrompt = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+      setPostPrompt(generatedPrompt.trim())
+    } catch (error) {
+      console.error('Gemini API Error:', error)
+      alert('Prompt oluşturulurken hata oluştu')
+    }
+
+    setIsGeneratingPrompt(false)
+  }
+
+  // Arka plan görseli al (Gemini veya Unsplash)
+  const getBackgroundUrl = async (prompt) => {
+    const response = await fetch('/api/generate-image', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt })
+    })
+
+    const data = await response.json()
+    console.log('Background API response:', data)
+
+    if (data.error) {
+      throw new Error(data.error)
+    }
+
+    // Gemini base64 döndürdüyse Supabase'e yükle
+    if (data.isBase64 && data.base64) {
+      console.log('Uploading Gemini image to Supabase...')
+      const filename = `bg_${Date.now()}.png`
+      const uploadedUrl = await uploadBase64ToSupabase(data.base64, filename)
+      console.log('Uploaded URL:', uploadedUrl)
+      return uploadedUrl
+    }
+
+    return data.imageUrl
+  }
+
+  // Base64 görseli Supabase Storage'a yükle
+  const uploadBase64ToSupabase = async (base64Data, filename) => {
+    const byteCharacters = atob(base64Data)
+    const byteNumbers = new Array(byteCharacters.length)
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i)
+    }
+    const byteArray = new Uint8Array(byteNumbers)
+    const blob = new Blob([byteArray], { type: 'image/png' })
+
+    const { data, error } = await supabase.storage
+      .from('instagram-backgrounds')
+      .upload(filename, blob, { contentType: 'image/png', upsert: true })
+
+    if (error) throw new Error('Supabase upload hatası: ' + error.message)
+
+    const { data: urlData } = supabase.storage
+      .from('instagram-backgrounds')
+      .getPublicUrl(filename)
+
+    return urlData.publicUrl
+  }
+
+  // Kendi template render sistemimiz
+  const renderTemplate = async (backgroundUrl, title) => {
+    console.log('=== TEMPLATE RENDER ===')
+    console.log('Background:', backgroundUrl)
+    console.log('Title:', title)
+
+    const response = await fetch('/api/render-template', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ backgroundUrl, title })
+    })
+
+    const data = await response.json()
+    console.log('Render response:', data.success ? 'Success!' : data.error)
+
+    if (data.error) {
+      throw new Error(data.error)
+    }
+
+    if (data.base64) {
+      // Base64'ü data URL'e çevir
+      return `data:${data.mimeType};base64,${data.base64}`
+    }
+
+    throw new Error('Template render hatası')
+  }
+
+  // Ana görsel üretme fonksiyonu
+  const generateImage = async () => {
+    if (!postPrompt || !selectedNews) return
+    setIsGeneratingImage(true)
+    setGeneratedImageUrl(null)
+
+    try {
+      // 1. Arka plan görseli al (Gemini veya Unsplash)
+      console.log('1. Arka plan görseli alınıyor...')
+      const backgroundUrl = await getBackgroundUrl(postPrompt)
+      console.log('Background URL:', backgroundUrl)
+
+      // 2. Kendi template sistemimizle render et
+      console.log('2. Template render ediliyor...')
+      const finalImageUrl = await renderTemplate(backgroundUrl, selectedNews.title_tr)
+
+      setGeneratedImageUrl(finalImageUrl)
+    } catch (error) {
+      console.error('Görsel üretme hatası:', error)
+      alert('Hata: ' + error.message)
+    }
+
+    setIsGeneratingImage(false)
+  }
+
+  // Görseli Supabase'e kaydet
+  const saveGeneratedPost = async () => {
+    if (!generatedImageUrl || !selectedNews) return
+    setIsSaving(true)
+
+    try {
+      const { error } = await supabase
+        .from('instagram_posts')
+        .insert({
+          news_id: selectedNews.id,
+          title: selectedNews.title_tr,
+          prompt: postPrompt,
+          image_url: generatedImageUrl,
+          created_at: new Date().toISOString()
+        })
+
+      if (error) throw error
+
+      alert('Post başarıyla kaydedildi!')
+      setShowPostGenerator(false)
+      setPostPrompt('')
+      setGeneratedImageUrl(null)
+    } catch (error) {
+      console.error('Save Error:', error)
+      alert('Kaydetme hatası: ' + error.message)
+    }
+
+    setIsSaving(false)
+  }
+
+  // Post generator'ı aç
+  const openPostGenerator = () => {
+    setPostPrompt('')
+    setGeneratedImageUrl(null)
+    setShowPostGenerator(true)
   }
 
   const getScoreColor = (score) => {
@@ -124,12 +330,29 @@ export default function Dashboard() {
                   <p className="text-sm text-gray-500">Haber Yönetim Paneli</p>
                 </div>
               </div>
-              <button 
-                onClick={fetchNews}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-2"
-              >
-                🔄 Yenile
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => router.push('/template-editor')}
+                  className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 flex items-center gap-2 font-medium shadow-sm"
+                >
+                  🎨 Gorsel Olustur
+                </button>
+                <button
+                  onClick={() => {
+                    setCategoryFilter('ETKINLIK')
+                    setShowQuickPostModal(true)
+                  }}
+                  className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 flex items-center gap-2 font-medium shadow-sm"
+                >
+                  📸 Post Olustur
+                </button>
+                <button
+                  onClick={fetchNews}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-2"
+                >
+                  🔄 Yenile
+                </button>
+              </div>
             </div>
           </div>
         </header>
@@ -304,15 +527,224 @@ export default function Dashboard() {
                   </div>
                 </div>
 
+                {/* ETKINLIK kategorisi için Post Üret butonu */}
+                {selectedNews.category === 'ETKINLIK' && (
+                  <div className="border-t pt-4 mt-4">
+                    <button
+                      onClick={openPostGenerator}
+                      className="w-full px-4 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 font-medium flex items-center justify-center gap-2"
+                    >
+                      📸 Instagram Post Üret
+                    </button>
+                  </div>
+                )}
+
                 <div className="border-t pt-4 mt-4">
-                  <a 
-                    href={selectedNews.source_url} 
-                    target="_blank" 
+                  <a
+                    href={selectedNews.source_url}
+                    target="_blank"
                     rel="noopener noreferrer"
                     className="text-red-600 hover:text-red-700 text-sm font-medium"
                   >
                     🔗 Haberi Oku →
                   </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Instagram Post Generator Modal */}
+        {showPostGenerator && selectedNews && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-6">
+                {/* Header */}
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl flex items-center justify-center">
+                      <span className="text-white text-2xl">📸</span>
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-bold text-gray-900">Instagram Post Uret</h2>
+                      <p className="text-sm text-gray-500">Etkinlik icin gorsel olustur</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setShowPostGenerator(false)}
+                    className="text-gray-400 hover:text-gray-600 text-2xl"
+                  >
+                    ×
+                  </button>
+                </div>
+
+                {/* Başlık Önizleme */}
+                <div className="bg-gray-50 rounded-lg p-4 mb-6">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Baslik (text_4)</label>
+                  <p className="text-gray-900 font-medium">{selectedNews.title_tr}</p>
+                </div>
+
+                {/* Prompt Girişi */}
+                <div className="mb-6">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Arka Plan Prompt'u (image_3)
+                    </label>
+                    <button
+                      onClick={generatePromptWithAI}
+                      disabled={isGeneratingPrompt}
+                      className="px-3 py-1 bg-blue-100 text-blue-700 rounded-lg text-sm font-medium hover:bg-blue-200 disabled:opacity-50 flex items-center gap-1"
+                    >
+                      {isGeneratingPrompt ? (
+                        <>Oneriliyor...</>
+                      ) : (
+                        <>AI ile Oner</>
+                      )}
+                    </button>
+                  </div>
+                  <textarea
+                    value={postPrompt}
+                    onChange={(e) => setPostPrompt(e.target.value)}
+                    placeholder="Arka plan gorseli icin prompt yazin veya AI'dan oneri alin..."
+                    className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
+                    rows={4}
+                  />
+                </div>
+
+                {/* Üret Butonu */}
+                <button
+                  onClick={generateImage}
+                  disabled={!postPrompt || isGeneratingImage}
+                  className="w-full px-4 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mb-6"
+                >
+                  {isGeneratingImage ? (
+                    <>Gorsel Olusturuluyor...</>
+                  ) : (
+                    <>Gorsel Uret</>
+                  )}
+                </button>
+
+                {/* Önizleme */}
+                {generatedImageUrl && (
+                  <div className="border rounded-xl p-4 mb-6">
+                    <label className="block text-sm font-medium text-gray-700 mb-3">Onizleme</label>
+                    <div className="relative">
+                      <img
+                        src={generatedImageUrl}
+                        alt="Generated Instagram Post"
+                        className="w-full rounded-lg shadow-lg"
+                      />
+                    </div>
+
+                    {/* Aksiyon Butonları */}
+                    <div className="flex gap-3 mt-4">
+                      <button
+                        onClick={generateImage}
+                        disabled={isGeneratingImage}
+                        className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+                      >
+                        Yeniden Uret
+                      </button>
+                      <button
+                        onClick={saveGeneratedPost}
+                        disabled={isSaving}
+                        className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+                      >
+                        {isSaving ? (
+                          <>Kaydediliyor...</>
+                        ) : (
+                          <>Kaydet</>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Quick Post Modal - Etkinlik haberi seç ve post oluştur */}
+        {showQuickPostModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+              <div className="p-6 border-b">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl flex items-center justify-center">
+                      <span className="text-white text-2xl">📸</span>
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-bold text-gray-900">Post Olustur</h2>
+                      <p className="text-sm text-gray-500">Etkinlik haberi secin ve Instagram postu olusturun</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setShowQuickPostModal(false)}
+                    className="text-gray-400 hover:text-gray-600 text-2xl"
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-6">
+                {etkinlikNews.length === 0 ? (
+                  <div className="text-center py-12 text-gray-500">
+                    <p>ETKINLIK kategorisinde haber bulunamadi.</p>
+                  </div>
+                ) : (
+                  <div className="grid gap-4">
+                    {etkinlikNews.map((item) => (
+                      <div
+                        key={item.id}
+                        className="border rounded-xl p-4 hover:border-purple-300 hover:bg-purple-50 cursor-pointer transition-all"
+                        onClick={() => {
+                          setSelectedNews(item)
+                          setShowQuickPostModal(false)
+                          openPostGenerator()
+                        }}
+                      >
+                        <div className="flex items-start gap-4">
+                          <div className={`w-12 h-12 rounded-lg flex items-center justify-center text-white font-bold flex-shrink-0 ${getScoreColor(item.score)}`}>
+                            {item.score}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className={`px-2 py-0.5 rounded text-xs font-medium ${getStatusBadge(item.status)}`}>
+                                {item.status}
+                              </span>
+                              <span className="text-xs text-gray-400">{item.source}</span>
+                            </div>
+                            <h3 className="font-medium text-gray-900">{item.title_tr || item.title_en}</h3>
+                            {item.content_snippet && (
+                              <p className="text-sm text-gray-500 mt-1 line-clamp-2">{item.content_snippet}</p>
+                            )}
+                          </div>
+                          <button className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg text-sm font-medium flex-shrink-0">
+                            Sec
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="p-4 border-t bg-gray-50">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-gray-500">
+                    Veya sifirdan gorsel olusturmak icin:
+                  </p>
+                  <button
+                    onClick={() => {
+                      setShowQuickPostModal(false)
+                      router.push('/template-editor')
+                    }}
+                    className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg text-sm font-medium"
+                  >
+                    Template Editor'u Ac
+                  </button>
                 </div>
               </div>
             </div>
