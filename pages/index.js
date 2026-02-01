@@ -21,7 +21,10 @@ export default function Dashboard() {
   const [imagePrompt, setImagePrompt] = useState('')
   const [postPrompt, setPostPrompt] = useState('')
   const [generatedImageUrl, setGeneratedImageUrl] = useState(null)
+  const [generatedSlide1, setGeneratedSlide1] = useState(null)
+  const [generatedSlide2, setGeneratedSlide2] = useState(null)
   const [generatedBgImage, setGeneratedBgImage] = useState(null)
+  const [selectedBgForPost, setSelectedBgForPost] = useState(null)
   const [isGeneratingPrompt, setIsGeneratingPrompt] = useState(false)
   const [isGeneratingImage, setIsGeneratingImage] = useState(false)
   const [isGeneratingBgImage, setIsGeneratingBgImage] = useState(false)
@@ -305,28 +308,94 @@ ${selectedNews.content_snippet ? `Detay: ${selectedNews.content_snippet}` : ''}
     throw new Error('Template render hatası')
   }
 
-  // Ana görsel üretme fonksiyonu
+  // Ana görsel üretme fonksiyonu - 2 slide üretir
   const generateImage = async () => {
-    if (!postPrompt || !selectedNews) return
+    if (!selectedNews) return
+
+    // instagram_summary ve instagram_detailed kontrolü
+    const slide1Text = instagramSummary || selectedNews.instagram_summary
+    const slide2Text = instagramDetailed || selectedNews.instagram_detailed
+
+    if (!slide1Text && !slide2Text) {
+      alert('Slide metinleri bos! Once Instagram iceriklerini doldurun.')
+      return
+    }
+
     setIsGeneratingImage(true)
-    setGeneratedImageUrl(null)
+    setGeneratedSlide1(null)
+    setGeneratedSlide2(null)
 
     try {
-      // 1. Arka plan görseli al (Gemini veya Unsplash)
+      // 1. Arka plan görseli al
       console.log('1. Arka plan görseli alınıyor...')
-      const backgroundUrl = await getBackgroundUrl(postPrompt)
+      let backgroundUrl = selectedBgForPost
+
+      if (!backgroundUrl && postPrompt) {
+        backgroundUrl = await getBackgroundUrl(postPrompt)
+        setSelectedBgForPost(backgroundUrl)
+      } else if (!backgroundUrl) {
+        // Default olarak haber başlığından görsel ara
+        const response = await fetch('/api/unsplash', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: selectedNews.title_tr || 'event' })
+        })
+        const data = await response.json()
+        backgroundUrl = data.imageUrl
+        setSelectedBgForPost(backgroundUrl)
+      }
+
       console.log('Background URL:', backgroundUrl)
 
-      // 2. Kendi template sistemimizle render et
-      console.log('2. Template render ediliyor...')
-      const finalImageUrl = await renderTemplate(backgroundUrl, selectedNews.title_tr)
+      // 2. Slide 1 render et (özet)
+      if (slide1Text) {
+        console.log('2. Slide 1 render ediliyor...')
+        const slide1Url = await renderTemplate(backgroundUrl, slide1Text)
+        setGeneratedSlide1(slide1Url)
+      }
 
-      setGeneratedImageUrl(finalImageUrl)
+      // 3. Slide 2 render et (detay)
+      if (slide2Text) {
+        console.log('3. Slide 2 render ediliyor...')
+        const slide2Url = await renderTemplate(backgroundUrl, slide2Text)
+        setGeneratedSlide2(slide2Url)
+      }
+
     } catch (error) {
       console.error('Görsel üretme hatası:', error)
       alert('Hata: ' + error.message)
     }
 
+    setIsGeneratingImage(false)
+  }
+
+  // Arka plan görselini değiştir
+  const changeBackground = async () => {
+    if (!postPrompt) {
+      alert('Lütfen arama terimi girin')
+      return
+    }
+
+    setIsGeneratingImage(true)
+    try {
+      const backgroundUrl = await getBackgroundUrl(postPrompt)
+      setSelectedBgForPost(backgroundUrl)
+
+      // Yeni arka planla tekrar render et
+      const slide1Text = instagramSummary || selectedNews?.instagram_summary
+      const slide2Text = instagramDetailed || selectedNews?.instagram_detailed
+
+      if (slide1Text) {
+        const slide1Url = await renderTemplate(backgroundUrl, slide1Text)
+        setGeneratedSlide1(slide1Url)
+      }
+      if (slide2Text) {
+        const slide2Url = await renderTemplate(backgroundUrl, slide2Text)
+        setGeneratedSlide2(slide2Url)
+      }
+    } catch (error) {
+      alert('Hata: ' + error.message)
+    }
     setIsGeneratingImage(false)
   }
 
@@ -364,7 +433,24 @@ ${selectedNews.content_snippet ? `Detay: ${selectedNews.content_snippet}` : ''}
   const openPostGenerator = () => {
     setPostPrompt('')
     setGeneratedImageUrl(null)
+    setGeneratedSlide1(null)
+    setGeneratedSlide2(null)
+    setSelectedBgForPost(null)
     setShowPostGenerator(true)
+  }
+
+  // Slide görselini indir
+  const downloadSlide = async (dataUrl, filename) => {
+    try {
+      const link = document.createElement('a')
+      link.href = dataUrl
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+    } catch (error) {
+      console.error('Download error:', error)
+    }
   }
 
   const getScoreColor = (score) => {
@@ -712,10 +798,10 @@ ${selectedNews.content_snippet ? `Detay: ${selectedNews.content_snippet}` : ''}
           </div>
         )}
 
-        {/* Instagram Post Generator Modal */}
+        {/* Instagram Post Generator Modal - 2 Slide */}
         {showPostGenerator && selectedNews && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="bg-white rounded-2xl max-w-5xl w-full max-h-[90vh] overflow-y-auto">
               <div className="p-6">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-6">
@@ -724,8 +810,8 @@ ${selectedNews.content_snippet ? `Detay: ${selectedNews.content_snippet}` : ''}
                       <span className="text-white text-2xl">📸</span>
                     </div>
                     <div>
-                      <h2 className="text-xl font-bold text-gray-900">Instagram Post Uret</h2>
-                      <p className="text-sm text-gray-500">Etkinlik icin gorsel olustur</p>
+                      <h2 className="text-xl font-bold text-gray-900">Instagram Carousel Uret</h2>
+                      <p className="text-sm text-gray-500">2 slide - ayni arka plan, farkli metinler</p>
                     </div>
                   </div>
                   <button
@@ -736,85 +822,136 @@ ${selectedNews.content_snippet ? `Detay: ${selectedNews.content_snippet}` : ''}
                   </button>
                 </div>
 
-                {/* Başlık Önizleme */}
-                <div className="bg-gray-50 rounded-lg p-4 mb-6">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Baslik (text_4)</label>
-                  <p className="text-gray-900 font-medium">{selectedNews.title_tr}</p>
+                {/* Slide Metinleri Önizleme */}
+                <div className="grid grid-cols-2 gap-4 mb-6">
+                  <div className="bg-purple-50 rounded-lg p-4">
+                    <label className="block text-sm font-medium text-purple-700 mb-1">Slide 1 - Ozet</label>
+                    <p className="text-gray-900 text-sm">{instagramSummary || selectedNews.instagram_summary || <span className="text-gray-400 italic">Icerik yok</span>}</p>
+                  </div>
+                  <div className="bg-indigo-50 rounded-lg p-4">
+                    <label className="block text-sm font-medium text-indigo-700 mb-1">Slide 2 - Detay</label>
+                    <p className="text-gray-900 text-sm">{instagramDetailed || selectedNews.instagram_detailed || <span className="text-gray-400 italic">Icerik yok</span>}</p>
+                  </div>
                 </div>
 
-                {/* Prompt Girişi */}
+                {/* Arka Plan Arama */}
                 <div className="mb-6">
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="block text-sm font-medium text-gray-700">
-                      Arka Plan Prompt'u (image_3)
-                    </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Arka Plan Gorseli Ara
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={postPrompt}
+                      onChange={(e) => setPostPrompt(e.target.value)}
+                      placeholder="Ornek: festival, party, concert..."
+                      className="flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      onKeyDown={(e) => e.key === 'Enter' && generateImage()}
+                    />
                     <button
-                      onClick={generatePromptWithAI}
-                      disabled={isGeneratingPrompt}
-                      className="px-3 py-1 bg-blue-100 text-blue-700 rounded-lg text-sm font-medium hover:bg-blue-200 disabled:opacity-50 flex items-center gap-1"
+                      onClick={generateImage}
+                      disabled={isGeneratingImage}
+                      className="px-6 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 font-medium disabled:opacity-50"
                     >
-                      {isGeneratingPrompt ? (
-                        <>Oneriliyor...</>
-                      ) : (
-                        <>AI ile Oner</>
-                      )}
+                      {isGeneratingImage ? 'Uretiliyor...' : 'Uret'}
                     </button>
                   </div>
-                  <textarea
-                    value={postPrompt}
-                    onChange={(e) => setPostPrompt(e.target.value)}
-                    placeholder="Arka plan gorseli icin prompt yazin veya AI'dan oneri alin..."
-                    className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
-                    rows={4}
-                  />
+                  {selectedBgForPost && (
+                    <div className="mt-2 flex items-center gap-2">
+                      <span className="text-xs text-gray-500">Secili arka plan:</span>
+                      <img src={selectedBgForPost} alt="bg" className="w-12 h-12 rounded object-cover" />
+                      <button
+                        onClick={changeBackground}
+                        disabled={isGeneratingImage || !postPrompt}
+                        className="text-xs text-purple-600 hover:text-purple-700 disabled:opacity-50"
+                      >
+                        Degistir
+                      </button>
+                    </div>
+                  )}
                 </div>
 
-                {/* Üret Butonu */}
-                <button
-                  onClick={generateImage}
-                  disabled={!postPrompt || isGeneratingImage}
-                  className="w-full px-4 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mb-6"
-                >
-                  {isGeneratingImage ? (
-                    <>Gorsel Olusturuluyor...</>
-                  ) : (
-                    <>Gorsel Uret</>
-                  )}
-                </button>
+                {/* 2 Slide Önizleme */}
+                {(generatedSlide1 || generatedSlide2) && (
+                  <div className="border rounded-xl p-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-4">Onizleme</label>
+                    <div className="grid grid-cols-2 gap-4">
+                      {/* Slide 1 */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium text-purple-700">Slide 1</span>
+                          {generatedSlide1 && (
+                            <button
+                              onClick={() => downloadSlide(generatedSlide1, `slide1_${selectedNews.id}.png`)}
+                              className="text-xs text-green-600 hover:text-green-700"
+                            >
+                              Indir
+                            </button>
+                          )}
+                        </div>
+                        {generatedSlide1 ? (
+                          <img src={generatedSlide1} alt="Slide 1" className="w-full rounded-lg shadow-lg" />
+                        ) : (
+                          <div className="aspect-[4/5] bg-gray-100 rounded-lg flex items-center justify-center text-gray-400">
+                            Slide 1 icerigi yok
+                          </div>
+                        )}
+                      </div>
 
-                {/* Önizleme */}
-                {generatedImageUrl && (
-                  <div className="border rounded-xl p-4 mb-6">
-                    <label className="block text-sm font-medium text-gray-700 mb-3">Onizleme</label>
-                    <div className="relative">
-                      <img
-                        src={generatedImageUrl}
-                        alt="Generated Instagram Post"
-                        className="w-full rounded-lg shadow-lg"
-                      />
+                      {/* Slide 2 */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium text-indigo-700">Slide 2</span>
+                          {generatedSlide2 && (
+                            <button
+                              onClick={() => downloadSlide(generatedSlide2, `slide2_${selectedNews.id}.png`)}
+                              className="text-xs text-green-600 hover:text-green-700"
+                            >
+                              Indir
+                            </button>
+                          )}
+                        </div>
+                        {generatedSlide2 ? (
+                          <img src={generatedSlide2} alt="Slide 2" className="w-full rounded-lg shadow-lg" />
+                        ) : (
+                          <div className="aspect-[4/5] bg-gray-100 rounded-lg flex items-center justify-center text-gray-400">
+                            Slide 2 icerigi yok
+                          </div>
+                        )}
+                      </div>
                     </div>
 
-                    {/* Aksiyon Butonları */}
+                    {/* Toplu İndir */}
                     <div className="flex gap-3 mt-4">
                       <button
-                        onClick={generateImage}
-                        disabled={isGeneratingImage}
-                        className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+                        onClick={changeBackground}
+                        disabled={isGeneratingImage || !postPrompt}
+                        className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium disabled:opacity-50"
                       >
-                        Yeniden Uret
+                        Farkli Gorsel
                       </button>
                       <button
-                        onClick={saveGeneratedPost}
-                        disabled={isSaving}
-                        className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+                        onClick={() => {
+                          if (generatedSlide1) downloadSlide(generatedSlide1, `slide1_${selectedNews.id}.png`)
+                          setTimeout(() => {
+                            if (generatedSlide2) downloadSlide(generatedSlide2, `slide2_${selectedNews.id}.png`)
+                          }, 500)
+                        }}
+                        disabled={!generatedSlide1 && !generatedSlide2}
+                        className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium disabled:opacity-50"
                       >
-                        {isSaving ? (
-                          <>Kaydediliyor...</>
-                        ) : (
-                          <>Kaydet</>
-                        )}
+                        Tumu Indir
                       </button>
                     </div>
+                  </div>
+                )}
+
+                {/* İçerik yoksa uyarı */}
+                {!instagramSummary && !selectedNews.instagram_summary && !instagramDetailed && !selectedNews.instagram_detailed && (
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center">
+                    <p className="text-yellow-800 text-sm">
+                      Slide metinleri bos! Once haber detayinda Instagram iceriklerini doldurun.
+                    </p>
                   </div>
                 )}
               </div>
