@@ -151,6 +151,17 @@ export default function TemplateEditor() {
     setHistoryIndex(-1)
   }, [templateMode])
 
+  // Load background image from localStorage (from "Gorsel Olustur")
+  useEffect(() => {
+    const savedBg = localStorage.getItem('backgroundImage')
+    if (savedBg) {
+      setBackgroundUrl(savedBg)
+      setTemplateMode('visual')
+      // Temizle - bir kere kullanıldıktan sonra
+      localStorage.removeItem('backgroundImage')
+    }
+  }, [])
+
   // Save to history
   const saveHistory = useCallback((newElements) => {
     const json = JSON.stringify(newElements)
