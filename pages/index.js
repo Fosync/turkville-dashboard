@@ -41,6 +41,7 @@ export default function Dashboard() {
   // AI Image Generation
   const [isGeneratingAIImage, setIsGeneratingAIImage] = useState(false)
   const [aiGeneratedImageUrl, setAiGeneratedImageUrl] = useState(null)
+  const [customImagePrompt, setCustomImagePrompt] = useState('')
 
   useEffect(() => {
     fetchNews()
@@ -171,7 +172,7 @@ export default function Dashboard() {
     setIsSavingInstagram(false)
   }
 
-  // AI ile görsel üret (Imagen 3)
+  // AI ile görsel üret (Imagen 4)
   const generateAIImage = async () => {
     if (!selectedNews) return
     setIsGeneratingAIImage(true)
@@ -187,7 +188,8 @@ export default function Dashboard() {
             title_tr: selectedNews.title_tr,
             category: selectedNews.category,
             instagram_summary: instagramSummary || selectedNews.instagram_summary
-          }
+          },
+          customPrompt: customImagePrompt || null
         })
       })
 
@@ -204,7 +206,9 @@ export default function Dashboard() {
         image_url: data.imageUrl
       })
 
-      alert('AI görseli başarıyla oluşturuldu!')
+      // Post generator için de kaydet
+      setSelectedBgForPost(data.imageUrl)
+
     } catch (error) {
       console.error('AI Image error:', error)
       alert('AI görsel üretimi başarısız: ' + error.message)
@@ -851,24 +855,25 @@ ${selectedNews.content_snippet ? `Detay: ${selectedNews.content_snippet}` : ''}
                     />
                   </div>
 
-                  {/* AI Görsel Önizleme */}
-                  {(selectedNews.image_url || aiGeneratedImageUrl) && (
-                    <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-                      <label className="block text-xs font-medium text-gray-500 mb-2">Mevcut Gorsel</label>
-                      <img
-                        src={aiGeneratedImageUrl || selectedNews.image_url}
-                        alt="News image"
-                        className="w-full max-w-[200px] rounded-lg shadow-sm"
-                      />
-                    </div>
-                  )}
-
-                  {/* Görsel Oluştur ve Post Üret Butonları */}
-                  <div className="flex gap-2 mt-4">
+                  {/* AI Görsel Üretimi */}
+                  <div className="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                    <label className="block text-sm font-medium text-blue-800 mb-2">
+                      🤖 AI Gorsel Uret
+                    </label>
+                    <input
+                      type="text"
+                      value={customImagePrompt}
+                      onChange={(e) => setCustomImagePrompt(e.target.value)}
+                      placeholder="Ornek: Toronto skyline at sunset, festival crowd..."
+                      className="w-full px-3 py-2 border rounded-lg text-sm mb-2 focus:ring-2 focus:ring-blue-500"
+                    />
+                    <p className="text-xs text-blue-600 mb-3">
+                      Bos birakirsan haber basligindan otomatik olusturulur
+                    </p>
                     <button
                       onClick={generateAIImage}
                       disabled={isGeneratingAIImage}
-                      className="flex-1 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="w-full px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {isGeneratingAIImage ? (
                         <span className="flex items-center justify-center gap-2">
@@ -876,18 +881,56 @@ ${selectedNews.content_snippet ? `Detay: ${selectedNews.content_snippet}` : ''}
                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                           </svg>
-                          AI Uretiyor...
+                          AI Uretiyor (10-20sn)...
                         </span>
                       ) : (
-                        '🤖 AI Gorsel Uret'
+                        'Gorsel Uret'
                       )}
                     </button>
+                  </div>
+
+                  {/* AI Görsel Önizleme */}
+                  {(selectedNews.image_url || aiGeneratedImageUrl) && (
+                    <div className="mb-4 p-4 bg-green-50 rounded-lg border border-green-200">
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="text-sm font-medium text-green-800">Uretilen Gorsel</label>
+                        <a
+                          href={aiGeneratedImageUrl || selectedNews.image_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-green-600 hover:text-green-700"
+                        >
+                          Tam boyut ac
+                        </a>
+                      </div>
+                      <img
+                        src={aiGeneratedImageUrl || selectedNews.image_url}
+                        alt="News image"
+                        className="w-full max-w-[250px] rounded-lg shadow-md"
+                      />
+                    </div>
+                  )}
+
+                  {/* Post Üret Butonu */}
+                  <div className="mt-4">
                     <button
-                      onClick={openPostGenerator}
-                      className="flex-1 px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 font-medium text-sm"
+                      onClick={() => {
+                        // AI görseli varsa onu kullan
+                        if (aiGeneratedImageUrl || selectedNews.image_url) {
+                          setSelectedBgForPost(aiGeneratedImageUrl || selectedNews.image_url)
+                        }
+                        openPostGenerator()
+                      }}
+                      disabled={!aiGeneratedImageUrl && !selectedNews.image_url}
+                      className="w-full px-4 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      📸 Post Uret
+                      📸 Bu Gorselle Post Uret
                     </button>
+                    {!aiGeneratedImageUrl && !selectedNews.image_url && (
+                      <p className="text-xs text-gray-500 mt-1 text-center">
+                        Once AI ile gorsel uretin
+                      </p>
+                    )}
                   </div>
                 </div>
 

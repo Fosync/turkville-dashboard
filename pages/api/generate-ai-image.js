@@ -52,7 +52,12 @@ function translateToEnglish(text) {
   return result
 }
 
-function generatePrompt(news) {
+function generatePrompt(news, customPrompt = null) {
+  // Kullanıcı özel prompt verdiyse onu kullan
+  if (customPrompt && customPrompt.trim()) {
+    return `${customPrompt.trim()}. Style: professional photography, high quality, 4K, Instagram post. IMPORTANT: absolutely no text, no words, no letters, no writing, no watermarks, no logos anywhere in the image.`
+  }
+
   const { title_tr, category, instagram_summary } = news
 
   // Başlığı İngilizce'ye çevir
@@ -62,8 +67,8 @@ function generatePrompt(news) {
   // Kategori stilini al
   const categoryStyle = CATEGORY_STYLES[category] || CATEGORY_STYLES['DIGER']
 
-  // Prompt oluştur
-  const prompt = `Professional editorial illustration for Instagram news post. Topic: ${englishTitle}. ${englishSummary ? `Context: ${englishSummary}.` : ''} Visual elements: ${categoryStyle}. Style: modern, clean, photojournalistic, high quality, 4K resolution, vibrant colors. Requirements: No text overlay, no watermark, no logos, no writing on image, no letters, no words.`
+  // Prompt oluştur - yazı olmaması için çok güçlü vurgu
+  const prompt = `Professional editorial photograph for Instagram news post. Subject: ${englishTitle}. ${englishSummary ? `Scene: ${englishSummary}.` : ''} Visual style: ${categoryStyle}. Technical: professional photography, cinematic lighting, high quality, 4K resolution, vibrant colors, sharp focus. CRITICAL REQUIREMENT: The image must contain absolutely NO TEXT, NO WORDS, NO LETTERS, NO NUMBERS, NO WRITING, NO WATERMARKS, NO LOGOS, NO SIGNS WITH TEXT, NO CAPTIONS. Pure visual imagery only.`
 
   return prompt
 }
@@ -78,7 +83,7 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'GEMINI_API_KEY is not configured' })
   }
 
-  const { news } = req.body
+  const { news, customPrompt } = req.body
 
   if (!news || !news.id) {
     return res.status(400).json({ error: 'News data with id is required' })
@@ -88,10 +93,11 @@ export default async function handler(req, res) {
   console.log('News ID:', news.id)
   console.log('Title:', news.title_tr)
   console.log('Category:', news.category)
+  console.log('Custom prompt:', customPrompt || '(auto-generated)')
 
   try {
     // 1. Prompt oluştur
-    const prompt = generatePrompt(news)
+    const prompt = generatePrompt(news, customPrompt)
     console.log('Generated prompt:', prompt)
 
     // 2. Imagen 4 API çağrısı
@@ -108,7 +114,7 @@ export default async function handler(req, res) {
           instances: [{ prompt }],
           parameters: {
             sampleCount: 1,
-            aspectRatio: '1:1'
+            aspectRatio: '3:4'
           }
         })
       }
