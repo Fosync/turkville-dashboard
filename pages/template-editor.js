@@ -137,14 +137,16 @@ export default function TemplateEditor() {
   const canvasRef = useRef(null)
   const canvasContainerRef = useRef(null)
 
-  // Elements
+  // Elements - Beyaz arka plan + tüm elementler kilitsiz
   const getVisualElements = () => [
+    { id: 'whiteBg', type: 'color', name: '[BG] Çalışma Alanı', color: '#FFFFFF',
+      x: 0, y: 0, width: canvasWidth, height: canvasHeight, zIndex: 0, opacity: 100, locked: false, visible: true },
     { id: 'gradient', type: 'gradient', name: '[FX] Gradient',
       x: 0, y: 0, width: canvasWidth, height: canvasHeight, zIndex: 2, opacity: 85,
       locked: false, visible: true, rotation: 0,
       gradientStart: 'rgba(0,0,0,0.9)', gradientEnd: 'rgba(0,0,0,0)', gradientDirection: 'to top' },
     { id: 'badge', type: 'image', name: '[UI] Etiket', src: '/images/Turkville_haber.png',
-      x: 30, y: 30, width: 180, height: 60, zIndex: 10, opacity: 100, locked: true, visible: true, rotation: 0, objectFit: 'contain' },
+      x: 30, y: 30, width: 180, height: 60, zIndex: 10, opacity: 100, locked: false, visible: true, rotation: 0, objectFit: 'contain' },
     { id: 'title', type: 'text', name: '[TXT] Başlık', text: 'ÖRNEK ETKİNLİK BAŞLIĞI',
       x: 30, y: canvasHeight - 250, width: canvasWidth - 60, height: 150, zIndex: 11, opacity: 100,
       fontSize: 52, fontWeight: 800, fontFamily: "'Gilroy', sans-serif", color: '#FFFFFF',
@@ -152,14 +154,16 @@ export default function TemplateEditor() {
       locked: false, visible: true, rotation: 0, shadow: true },
     { id: 'banner', type: 'image', name: '[UI] Banner', src: '/images/banner.png',
       x: 0, y: canvasHeight - 100, width: canvasWidth, height: 100, zIndex: 12,
-      opacity: 100, locked: true, visible: true, rotation: 0, objectFit: 'contain' }
+      opacity: 100, locked: false, visible: true, rotation: 0, objectFit: 'contain' }
   ]
 
   const getTextElements = () => [
+    { id: 'whiteBg', type: 'color', name: '[BG] Çalışma Alanı', color: '#FFFFFF',
+      x: 0, y: 0, width: canvasWidth, height: canvasHeight, zIndex: 0, opacity: 100, locked: false, visible: true },
     { id: 'colorBg', type: 'color', name: '[BG] Renk', color: bgColor,
-      x: 0, y: 0, width: canvasWidth, height: canvasHeight, zIndex: 1, opacity: 100, locked: true, visible: true },
+      x: 0, y: 0, width: canvasWidth, height: canvasHeight, zIndex: 1, opacity: 100, locked: false, visible: true },
     { id: 'badge', type: 'image', name: '[UI] Etiket', src: '/images/Turkville_haber.png',
-      x: 30, y: 30, width: 180, height: 60, zIndex: 10, opacity: 100, locked: true, visible: true, rotation: 0, objectFit: 'contain' },
+      x: 30, y: 30, width: 180, height: 60, zIndex: 10, opacity: 100, locked: false, visible: true, rotation: 0, objectFit: 'contain' },
     { id: 'title', type: 'text', name: '[TXT] İçerik', text: 'UZUN METİN HABERİ',
       x: 30, y: 150, width: canvasWidth - 60, height: canvasHeight - 300, zIndex: 11, opacity: 100,
       fontSize: 48, fontWeight: 700, fontFamily: "'Gilroy', sans-serif", color: '#FFFFFF',
@@ -167,7 +171,7 @@ export default function TemplateEditor() {
       locked: false, visible: true, rotation: 0, shadow: false },
     { id: 'banner', type: 'image', name: '[UI] Banner', src: '/images/banner.png',
       x: 0, y: canvasHeight - 100, width: canvasWidth, height: 100, zIndex: 12,
-      opacity: 100, locked: true, visible: true, rotation: 0, objectFit: 'contain' }
+      opacity: 100, locked: false, visible: true, rotation: 0, objectFit: 'contain' }
   ]
 
   const [elements, setElements] = useState(() => getVisualElements())
