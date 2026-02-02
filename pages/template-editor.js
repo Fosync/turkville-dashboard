@@ -1395,7 +1395,10 @@ export default function TemplateEditor() {
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat',
-          opacity: el.opacity / 100
+          opacity: el.opacity / 100,
+          imageRendering: '-webkit-optimize-contrast',
+          WebkitBackfaceVisibility: 'hidden',
+          transform: 'translateZ(0)'
         }} />
       )
     }
@@ -1412,7 +1415,10 @@ export default function TemplateEditor() {
           backgroundSize: bgSize,
           backgroundPosition: el.focalPoint || 'center',
           backgroundRepeat: 'no-repeat',
-          backgroundColor: 'transparent'
+          backgroundColor: 'transparent',
+          imageRendering: '-webkit-optimize-contrast', // Kalite için
+          WebkitBackfaceVisibility: 'hidden', // Anti-alias
+          transform: 'translateZ(0)' // GPU acceleration
         }}>
           {!el.src && (
             <div className="w-full h-full flex items-center justify-center">
