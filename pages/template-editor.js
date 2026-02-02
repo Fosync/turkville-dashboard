@@ -2,6 +2,100 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { Rnd } from 'react-rnd'
 import Head from 'next/head'
 import { supabase } from '../lib/supabase'
+import html2canvas from 'html2canvas'
+
+// ============================================================
+// TEXT HEIGHT HESAPLAMA - Auto-fit için
+// Yazı kutusunun yüksekliğini yazıya göre otomatik hesaplar
+// ============================================================
+const calculateTextHeight = (text, width, fontSize, lineHeight = 1.2, fontFamily = 'Gilroy', fontWeight = 800, letterSpacing = 0) => {
+  if (!text || !width || !fontSize) return fontSize * lineHeight
+
+  // Tarayıcıda canvas ile ölç
+  if (typeof document !== 'undefined') {
+    const canvas = document.createElement('canvas')
+    const ctx = canvas.getContext('2d')
+    ctx.font = `${fontWeight} ${fontSize}px ${fontFamily.replace(/'/g, '')}`
+
+    const words = text.split(/\s+/)
+    let line = ''
+    let lineCount = 0
+    const maxWidth = width - 10 // padding için biraz margin
+
+    for (const word of words) {
+      const testLine = line ? line + ' ' + word : word
+      const metrics = ctx.measureText(testLine)
+      // Letter spacing'i de hesaba kat
+      const adjustedWidth = metrics.width + (testLine.length * letterSpacing)
+
+      if (adjustedWidth > maxWidth && line) {
+        lineCount++
+        line = word
+      } else {
+        line = testLine
+      }
+    }
+    if (line) lineCount++
+
+    // Newline karakterlerini de say
+    const newlineCount = (text.match(/\n/g) || []).length
+    lineCount += newlineCount
+
+    return Math.max(lineCount, 1) * fontSize * lineHeight + 10 // padding
+  }
+
+  // SSR fallback
+  return fontSize * lineHeight * 3
+}
+
+// Auto-fit text component - metin kutuya sığacak şekilde otomatik küçülür
+const AutoFitText = ({ text, baseFontSize, scale, style, verticalAlign = 'top' }) => {
+  const containerRef = useRef(null)
+  const textRef = useRef(null)
+  const [fontSize, setFontSize] = useState(baseFontSize)
+
+  useEffect(() => {
+    if (!containerRef.current || !textRef.current) return
+
+    const container = containerRef.current
+    const textEl = textRef.current
+
+    // Reset to base font size first
+    let currentSize = baseFontSize
+    textEl.style.fontSize = `${currentSize * scale}px`
+
+    // Check if text overflows and reduce font size
+    const minFontSize = 16
+    while (textEl.scrollHeight > container.clientHeight && currentSize > minFontSize) {
+      currentSize -= 2
+      textEl.style.fontSize = `${currentSize * scale}px`
+    }
+
+    setFontSize(currentSize)
+  }, [text, baseFontSize, scale])
+
+  const justifyClass = verticalAlign === 'bottom' ? 'justify-end' : verticalAlign === 'center' ? 'justify-center' : 'justify-start'
+
+  return (
+    <div
+      ref={containerRef}
+      className={`w-full h-full flex flex-col ${justifyClass} pointer-events-none overflow-hidden`}
+    >
+      <div
+        ref={textRef}
+        style={{
+          fontSize: fontSize * scale,
+          ...style,
+          wordWrap: 'break-word',
+          overflowWrap: 'break-word',
+          whiteSpace: 'pre-wrap',
+        }}
+      >
+        {text}
+      </div>
+    </div>
+  )
+}
 
 const GEMINI_API_KEY = 'AIzaSyB5w3fvek5gkxhcZIe_5r8XKtgQHKz8Nws'
 
@@ -149,14 +243,14 @@ export default function TemplateEditor() {
       gradientStartPos: 0, gradientEndPos: 60,
       gradientDirection: 'to top' },
     { id: 'badge', type: 'image', name: '[UI] Etiket', src: '/images/Turkville_haber.png',
-      x: 30, y: 30, width: 180, height: 60, zIndex: 10, opacity: 100, locked: false, visible: true, rotation: 0, objectFit: 'contain' },
+      x: 61, y: 120, width: 181, height: 92, zIndex: 10, opacity: 100, locked: false, visible: true, rotation: 0, objectFit: 'contain' },
     { id: 'title', type: 'text', name: '[TXT] Başlık', text: 'ÖRNEK ETKİNLİK BAŞLIĞI',
-      x: 30, y: canvasHeight - 250, width: canvasWidth - 60, height: 150, zIndex: 11, opacity: 100,
-      fontSize: 52, fontWeight: 800, fontFamily: "'Gilroy', sans-serif", color: '#FFFFFF',
-      textAlign: 'left', lineHeight: 1.15, letterSpacing: 0, textTransform: 'uppercase',
+      x: 50, y: canvasHeight - 152 - 380, width: 980, height: 380, zIndex: 11, opacity: 100,
+      fontSize: 64, fontWeight: 800, fontFamily: "'Gilroy', sans-serif", color: '#FFFFEB',
+      textAlign: 'left', lineHeight: 1.2, letterSpacing: 3.2, textTransform: 'uppercase',
       locked: false, visible: true, rotation: 0, shadow: true },
     { id: 'banner', type: 'image', name: '[UI] Banner', src: '/images/banner.png',
-      x: 0, y: canvasHeight - 100, width: canvasWidth, height: 100, zIndex: 12,
+      x: 50, y: 1172, width: 980, height: 107, zIndex: 12,
       opacity: 100, locked: false, visible: true, rotation: 0, objectFit: 'contain' }
   ]
 
@@ -166,14 +260,14 @@ export default function TemplateEditor() {
     { id: 'colorBg', type: 'color', name: '[BG] Renk', color: bgColor,
       x: 0, y: 0, width: canvasWidth, height: canvasHeight, zIndex: 1, opacity: 100, locked: false, visible: true },
     { id: 'badge', type: 'image', name: '[UI] Etiket', src: '/images/Turkville_haber.png',
-      x: 30, y: 30, width: 180, height: 60, zIndex: 10, opacity: 100, locked: false, visible: true, rotation: 0, objectFit: 'contain' },
+      x: 61, y: 120, width: 181, height: 92, zIndex: 10, opacity: 100, locked: false, visible: true, rotation: 0, objectFit: 'contain' },
     { id: 'title', type: 'text', name: '[TXT] İçerik', text: 'UZUN METİN HABERİ',
-      x: 30, y: 150, width: canvasWidth - 60, height: canvasHeight - 300, zIndex: 11, opacity: 100,
-      fontSize: 48, fontWeight: 700, fontFamily: "'Gilroy', sans-serif", color: '#FFFFFF',
-      textAlign: 'left', lineHeight: 1.3, letterSpacing: 0, textTransform: 'uppercase',
+      x: 50, y: 250, width: 980, height: canvasHeight - 410, zIndex: 11, opacity: 100,
+      fontSize: 56, fontWeight: 800, fontFamily: "'Gilroy', sans-serif", color: '#FFFFEB',
+      textAlign: 'left', lineHeight: 1.25, letterSpacing: 2, textTransform: 'uppercase',
       locked: false, visible: true, rotation: 0, shadow: false },
     { id: 'banner', type: 'image', name: '[UI] Banner', src: '/images/banner.png',
-      x: 0, y: canvasHeight - 100, width: canvasWidth, height: 100, zIndex: 12,
+      x: 50, y: 1172, width: 980, height: 107, zIndex: 12,
       opacity: 100, locked: false, visible: true, rotation: 0, objectFit: 'contain' }
   ]
 
@@ -188,6 +282,35 @@ export default function TemplateEditor() {
     setHistory([])
     setHistoryIndex(-1)
   }, [templateMode])
+
+  // Text layer'ların height'ını client-side'da otomatik hesapla
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+
+    setElements(prev => {
+      let changed = false
+      const updated = prev.map(el => {
+        if (el.type === 'text') {
+          const newHeight = calculateTextHeight(
+            el.text,
+            el.width,
+            el.fontSize,
+            el.lineHeight || 1.2,
+            el.fontFamily,
+            el.fontWeight,
+            el.letterSpacing || 0
+          )
+          // Sadece önemli fark varsa güncelle (döngüyü önle)
+          if (Math.abs(newHeight - el.height) > 5) {
+            changed = true
+            return { ...el, height: newHeight }
+          }
+        }
+        return el
+      })
+      return changed ? updated : prev
+    })
+  }, [templateMode]) // Sadece template mode değiştiğinde çalış
 
   // Kategorileri DB'den çek
   useEffect(() => {
@@ -363,7 +486,32 @@ export default function TemplateEditor() {
   // Update element
   const updateElement = useCallback((id, updates, skipHistory = false) => {
     setElements(prev => {
-      const newElements = prev.map(el => el.id === id ? { ...el, ...updates } : el)
+      const newElements = prev.map(el => {
+        if (el.id !== id) return el
+
+        const updated = { ...el, ...updates }
+
+        // Text layer için: metin, font veya width değiştiğinde height otomatik hesapla
+        if (updated.type === 'text') {
+          const textChanged = 'text' in updates
+          const fontChanged = 'fontSize' in updates || 'fontFamily' in updates || 'fontWeight' in updates || 'lineHeight' in updates || 'letterSpacing' in updates
+          const widthChanged = 'width' in updates
+
+          if (textChanged || fontChanged || widthChanged) {
+            updated.height = calculateTextHeight(
+              updated.text,
+              updated.width,
+              updated.fontSize,
+              updated.lineHeight || 1.2,
+              updated.fontFamily,
+              updated.fontWeight,
+              updated.letterSpacing || 0
+            )
+          }
+        }
+
+        return updated
+      })
       if (!skipHistory) saveHistory(newElements)
       return newElements
     })
@@ -421,9 +569,17 @@ export default function TemplateEditor() {
 
     let newElement
     if (type === 'text') {
-      newElement = { ...baseProps, type: 'text', width: 400, height: 100, text: 'Yeni Metin',
-        fontSize: 36, fontWeight: 600, fontFamily: "'Gilroy', sans-serif", color: '#FFFFFF',
-        textAlign: 'left', lineHeight: 1.2, letterSpacing: 0, textTransform: 'none', shadow: true }
+      const defaultText = 'Yeni Metin'
+      const defaultWidth = 400
+      const defaultFontSize = 36
+      const defaultLineHeight = 1.2
+      const defaultFontFamily = "'Gilroy', sans-serif"
+      const defaultFontWeight = 600
+      // Height otomatik hesapla
+      const autoHeight = calculateTextHeight(defaultText, defaultWidth, defaultFontSize, defaultLineHeight, defaultFontFamily, defaultFontWeight, 0)
+      newElement = { ...baseProps, type: 'text', width: defaultWidth, height: autoHeight, text: defaultText,
+        fontSize: defaultFontSize, fontWeight: defaultFontWeight, fontFamily: defaultFontFamily, color: '#FFFFFF',
+        textAlign: 'left', lineHeight: defaultLineHeight, letterSpacing: 0, textTransform: 'none', shadow: true }
     } else if (type === 'rect') {
       newElement = { ...baseProps, type: 'rect', width: 200, height: 150,
         fill: '#3b82f6', stroke: '#1d4ed8', strokeWidth: 0, borderRadius: 0 }
@@ -436,7 +592,7 @@ export default function TemplateEditor() {
     } else if (type === 'color') {
       newElement = { ...baseProps, type: 'color', width: canvasWidth, height: canvasHeight, color: '#dc2626' }
     } else {
-      newElement = { ...baseProps, type: 'image', width: 200, height: 200, src: options.src || '', objectFit: 'contain' }
+      newElement = { ...baseProps, type: 'image', width: 200, height: 200, src: options.src || '', objectFit: 'cover' }
     }
 
     setElements(prev => {
@@ -500,18 +656,31 @@ export default function TemplateEditor() {
         setShiftPressed(true)
       }
 
-      // Space for pan mode
-      if (e.code === 'Space' && !editingTextId) {
+      // Input/Textarea içindeyse global kısayolları engelleme
+      const activeEl = document.activeElement
+      const isInInput = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')
+
+      // Space for pan mode (sadece input dışında)
+      if (e.code === 'Space' && !editingTextId && !isInInput) {
         e.preventDefault()
         setSpacePressed(true)
         return
       }
 
-      // Skip if editing text
+      // Skip if editing text or in input field
       if (editingTextId || renamingId) {
         if (e.key === 'Escape') {
           setEditingTextId(null)
           setRenamingId(null)
+        }
+        return
+      }
+
+      // Input içindeyse Ctrl+C/V/Z/Y için varsayılan davranışa izin ver
+      if (isInInput) {
+        // Sadece Escape'i yakala
+        if (e.key === 'Escape') {
+          activeEl.blur()
         }
         return
       }
@@ -1012,21 +1181,38 @@ export default function TemplateEditor() {
     setIsGenerating(true)
     setAiError('')
 
-    try {
-      const keywordRes = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: `Extract 2-3 English keywords for Unsplash image search from: "${aiPrompt}". Return ONLY comma-separated keywords.` }] }]
-          })
-        }
-      )
-      const keywordData = await keywordRes.json()
-      let keywords = keywordData.candidates?.[0]?.content?.parts?.[0]?.text?.trim()
-        .toLowerCase().replace(/[^a-z,\s]/g, '').split(/[\s,]+/).filter(k => k && k.length > 2).slice(0, 3).join(' ') || 'event celebration'
+    // Fallback görseller
+    const fallbackImages = [
+      'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=1080&h=1350&fit=crop',
+      'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=1080&h=1350&fit=crop',
+      'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=1080&h=1350&fit=crop',
+      'https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=1080&h=1350&fit=crop',
+      'https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?w=1080&h=1350&fit=crop'
+    ]
 
+    try {
+      // Gemini ile anahtar kelime çıkar
+      let keywords = aiPrompt.trim()
+      try {
+        const keywordRes = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: `Extract 2-3 English keywords for Unsplash image search from: "${aiPrompt}". Return ONLY comma-separated keywords.` }] }]
+            })
+          }
+        )
+        const keywordData = await keywordRes.json()
+        const extracted = keywordData.candidates?.[0]?.content?.parts?.[0]?.text?.trim()
+          .toLowerCase().replace(/[^a-z,\s]/g, '').split(/[\s,]+/).filter(k => k && k.length > 2).slice(0, 3).join(' ')
+        if (extracted) keywords = extracted
+      } catch (e) {
+        console.log('Gemini failed, using original prompt')
+      }
+
+      // Unsplash API'den görsel ara
       const unsplashRes = await fetch('/api/unsplash', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1034,16 +1220,34 @@ export default function TemplateEditor() {
       })
       const unsplashData = await unsplashRes.json()
 
-      if (unsplashData.imageUrl) {
-        setBackgroundUrl(unsplashData.imageUrl)
-        setShowAIModal(false)
-        setAiPrompt('')
-      } else {
-        throw new Error('Görsel bulunamadı')
-      }
+      const imageUrl = unsplashData.imageUrl || fallbackImages[Math.floor(Math.random() * fallbackImages.length)]
+
+      // whiteBg elementini görsele çevir
+      setElements(prev => prev.map(el => {
+        if (el.id === 'whiteBg') {
+          return { ...el, type: 'image', src: imageUrl, name: '[BG] AI Arka Plan', objectFit: 'cover' }
+        }
+        return el
+      }))
+      setBackgroundUrl(imageUrl)
+      setShowAIModal(false)
+      setAiPrompt('')
+      setAiError('')
     } catch (err) {
-      setAiError(`Hata: ${err.message}`)
-      setBackgroundUrl('https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=1080&q=80')
+      // Her durumda bir fallback görsel ver
+      const randomFallback = fallbackImages[Math.floor(Math.random() * fallbackImages.length)]
+
+      // whiteBg elementini görsele çevir
+      setElements(prev => prev.map(el => {
+        if (el.id === 'whiteBg') {
+          return { ...el, type: 'image', src: randomFallback, name: '[BG] Fallback', objectFit: 'cover' }
+        }
+        return el
+      }))
+      setBackgroundUrl(randomFallback)
+      setAiError('API hatası, varsayılan görsel kullanıldı')
+      setShowAIModal(false)
+      setAiPrompt('')
     }
     setIsGenerating(false)
   }
@@ -1071,29 +1275,50 @@ export default function TemplateEditor() {
   const exportImage = async () => {
     setIsExporting(true)
     try {
-      const titleEl = elements.find(e => e.type === 'text')
-      const res = await fetch('/api/render-template', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          backgroundUrl: templateMode === 'text' ? bgColor : backgroundUrl,
-          title: titleEl?.text || '',
-          mode: templateMode,
-          format: exportFormat,
-          quality: exportQuality,
-          scale: exportScale
-        })
-      })
-      const data = await res.json()
-      if (data.base64) {
-        const link = document.createElement('a')
-        const mimeType = exportFormat === 'jpg' ? 'image/jpeg' : exportFormat === 'webp' ? 'image/webp' : 'image/png'
-        link.href = `data:${mimeType};base64,${data.base64}`
-        link.download = `instagram-post-${Date.now()}.${exportFormat}`
-        link.click()
-        setShowExportModal(false)
+      // Canvas elementini bul
+      const canvasElement = canvasRef.current
+      if (!canvasElement) {
+        throw new Error('Canvas bulunamadı')
       }
+
+      // Seçimi kaldır (selection border görünmesin)
+      const previousSelection = [...selectedIds]
+      setSelectedIds([])
+
+      // Biraz bekle UI güncellensin
+      await new Promise(resolve => setTimeout(resolve, 100))
+
+      // html2canvas ile canvas'ı yakala
+      const canvas = await html2canvas(canvasElement, {
+        scale: exportScale * 2, // Yüksek kalite için
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: null,
+        width: canvasWidth,
+        height: canvasHeight,
+        logging: false
+      })
+
+      // Seçimi geri yükle
+      setSelectedIds(previousSelection)
+
+      // İndir
+      const link = document.createElement('a')
+      const mimeType = exportFormat === 'jpg' ? 'image/jpeg' : exportFormat === 'webp' ? 'image/webp' : 'image/png'
+      const quality = exportQuality === 'high' ? 0.95 : exportQuality === 'medium' ? 0.8 : 0.6
+
+      if (exportFormat === 'png') {
+        link.href = canvas.toDataURL('image/png')
+      } else {
+        link.href = canvas.toDataURL(mimeType, quality)
+      }
+
+      link.download = `tasarim-${Date.now()}.${exportFormat}`
+      link.click()
+      setShowExportModal(false)
+
     } catch (err) {
+      console.error('Export error:', err)
       alert('Export hatası: ' + err.message)
     }
     setIsExporting(false)
@@ -1158,15 +1383,36 @@ export default function TemplateEditor() {
       )
     }
     if (el.type === 'overlay') {
-      return <img src={el.src} alt="" className="w-full h-full object-cover pointer-events-none" style={{ opacity: el.opacity / 100 }} />
+      // html2canvas uyumluluğu için background-image yaklaşımı
+      return (
+        <div className="w-full h-full pointer-events-none" style={{
+          backgroundImage: `url(${el.src})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+          opacity: el.opacity / 100
+        }} />
+      )
     }
     if (el.type === 'image') {
+      // html2canvas uyumluluğu için background-image yaklaşımı
+      // object-fit: cover mantığı için background-size: cover kullanıyoruz
+      const bgSize = el.objectFit === 'contain' ? 'contain' : el.objectFit === 'fill' ? '100% 100%' : 'cover'
       return (
-        <div className="w-full h-full flex items-center justify-center" style={{ opacity: el.opacity / 100, borderRadius: el.borderRadius || 0, overflow: 'hidden', background: 'transparent' }}>
-          {el.src ? (
-            <img src={el.src} alt="" draggable={false} className="w-full h-full pointer-events-none" style={{ objectFit: el.objectFit || 'contain', objectPosition: el.focalPoint || 'center', background: 'transparent' }} />
-          ) : (
-            <span className="text-gray-500 text-xs">Görsel yok</span>
+        <div className="w-full h-full" style={{
+          opacity: el.opacity / 100,
+          borderRadius: el.borderRadius || 0,
+          overflow: 'hidden',
+          backgroundImage: el.src ? `url(${el.src})` : 'none',
+          backgroundSize: bgSize,
+          backgroundPosition: el.focalPoint || 'center',
+          backgroundRepeat: 'no-repeat',
+          backgroundColor: 'transparent'
+        }}>
+          {!el.src && (
+            <div className="w-full h-full flex items-center justify-center">
+              <span className="text-gray-500 text-xs">Görsel yok</span>
+            </div>
           )}
         </div>
       )
@@ -1222,26 +1468,26 @@ export default function TemplateEditor() {
           />
         )
       }
+      // Auto-fit text component
       return (
-        <div className="w-full h-full flex items-end pointer-events-none p-0" style={{
-          fontSize: el.fontSize * scale,
-          fontWeight: el.fontWeight,
-          fontFamily: el.fontFamily,
-          color: el.color,
-          opacity: el.opacity / 100,
-          lineHeight: el.lineHeight,
-          letterSpacing: el.letterSpacing || 0,
-          textAlign: el.textAlign,
-          textTransform: el.textTransform || 'none',
-          textShadow: el.shadow ? '2px 2px 8px rgba(0,0,0,0.9)' : 'none',
-          WebkitTextStroke: el.textStroke ? `${el.textStrokeWidth || 1}px ${el.textStrokeColor || '#000000'}` : 'none',
-          wordWrap: 'break-word',
-          overflowWrap: 'break-word',
-          whiteSpace: 'pre-wrap',
-          overflow: 'hidden'
-        }}>
-          {el.text}
-        </div>
+        <AutoFitText
+          text={el.text}
+          baseFontSize={el.fontSize}
+          scale={scale}
+          verticalAlign={el.verticalAlign || 'top'}
+          style={{
+            fontWeight: el.fontWeight,
+            fontFamily: el.fontFamily,
+            color: el.color,
+            opacity: el.opacity / 100,
+            lineHeight: el.lineHeight,
+            letterSpacing: el.letterSpacing || 0,
+            textAlign: el.textAlign,
+            textTransform: el.textTransform || 'none',
+            textShadow: el.shadow ? '2px 2px 8px rgba(0,0,0,0.9)' : 'none',
+            WebkitTextStroke: el.textStroke ? `${el.textStrokeWidth || 1}px ${el.textStrokeColor || '#000000'}` : 'none',
+          }}
+        />
       )
     }
     return null
@@ -1486,12 +1732,38 @@ export default function TemplateEditor() {
                   {uploadedImages.length > 0 ? (
                     <div className="grid grid-cols-3 gap-1 max-h-32 overflow-auto">
                       {uploadedImages.map(img => (
-                        <div key={img.id}
-                          draggable
-                          onDragStart={(e) => { e.dataTransfer.setData('image-src', img.src); e.dataTransfer.setData('image-name', img.name) }}
-                          onClick={() => addElement('image', { src: img.src, name: img.name })}
-                          className="aspect-square bg-gray-700 rounded overflow-hidden cursor-pointer hover:ring-2 ring-blue-500" title={img.name}>
-                          <img src={img.src} alt="" className="w-full h-full object-cover" />
+                        <div key={img.id} className="relative group aspect-square bg-gray-700 rounded overflow-hidden">
+                          <img
+                            src={img.src} alt="" className="w-full h-full object-cover"
+                            draggable
+                            onDragStart={(e) => { e.dataTransfer.setData('image-src', img.src); e.dataTransfer.setData('image-name', img.name) }}
+                          />
+                          {backgroundUrl === img.src && (
+                            <div className="absolute top-0 right-0 bg-green-500 text-white text-[8px] px-1 rounded-bl">✓ BG</div>
+                          )}
+                          <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                // whiteBg elementini görsele çevir
+                                setElements(prev => prev.map(el => {
+                                  if (el.id === 'whiteBg') {
+                                    return { ...el, type: 'image', src: img.src, name: '[BG] Arka Plan', objectFit: 'cover' }
+                                  }
+                                  return el
+                                }))
+                                setBackgroundUrl(img.src)
+                                alert('Arka plan ayarlandı!')
+                              }}
+                              className="px-2 py-0.5 bg-blue-600 rounded text-[9px] hover:bg-blue-500 active:bg-blue-700"
+                              title="Arka plan olarak ayarla"
+                            >🖼️ Arka Plan</button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); addElement('image', { src: img.src, name: img.name }); }}
+                              className="px-2 py-0.5 bg-green-600 rounded text-[9px] hover:bg-green-500 active:bg-green-700"
+                              title="Katman olarak ekle"
+                            >➕ Katman</button>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -1616,10 +1888,42 @@ export default function TemplateEditor() {
                     }}
                     onResizeStop={(e, dir, ref, delta, pos) => {
                       if (el.locked) return
-                      updateElement(el.id, { width: parseInt(ref.style.width) / scale, height: parseInt(ref.style.height) / scale, x: pos.x / scale, y: pos.y / scale })
+
+                      const newWidth = parseInt(ref.style.width) / scale
+                      const newX = pos.x / scale
+
+                      // Text layer için sadece width değişir, height otomatik hesaplanır
+                      if (el.type === 'text') {
+                        const newHeight = calculateTextHeight(
+                          el.text,
+                          newWidth,
+                          el.fontSize,
+                          el.lineHeight || 1.2,
+                          el.fontFamily,
+                          el.fontWeight,
+                          el.letterSpacing || 0
+                        )
+                        updateElement(el.id, { width: newWidth, height: newHeight, x: newX, y: el.y })
+                      } else {
+                        // Diğer layer'lar normal resize
+                        updateElement(el.id, {
+                          width: newWidth,
+                          height: parseInt(ref.style.height) / scale,
+                          x: newX,
+                          y: pos.y / scale
+                        })
+                      }
                     }}
                     disableDragging={el.locked || editingTextId === el.id || spacePressed}
-                    enableResizing={!el.locked && editingTextId !== el.id && !spacePressed}
+                    enableResizing={
+                      el.locked || editingTextId === el.id || spacePressed
+                        ? false
+                        : el.type === 'text'
+                          // Text layer: sadece yatay resize (sol-sağ)
+                          ? { left: true, right: true, top: false, bottom: false, topLeft: false, topRight: false, bottomLeft: false, bottomRight: false }
+                          // Diğer layer'lar: tüm yönler
+                          : true
+                    }
                     style={{ zIndex: el.zIndex }}
                     bounds="parent"
                     onClick={(e) => handleElementClick(e, el.id)}
@@ -1655,13 +1959,25 @@ export default function TemplateEditor() {
                 <div>
                   <div className="text-gray-500 mb-1 font-semibold">POZİSYON & BOYUT</div>
                   <div className="grid grid-cols-4 gap-1">
-                    {['x', 'y', 'width', 'height'].map(prop => (
-                      <div key={prop}>
-                        <label className="text-gray-400 uppercase text-[10px]">{prop[0]}</label>
-                        <input type="number" value={Math.round(selectedElement[prop])} onChange={(e) => updateElement(selectedId, { [prop]: parseInt(e.target.value) || 0 })}
-                          className="w-full px-1 py-0.5 bg-[#1a1a2e] rounded border border-gray-700" />
-                      </div>
-                    ))}
+                    {['x', 'y', 'width', 'height'].map(prop => {
+                      // Text layer için height readonly (otomatik hesaplanır)
+                      const isReadonly = selectedElement.type === 'text' && prop === 'height'
+                      return (
+                        <div key={prop}>
+                          <label className="text-gray-400 uppercase text-[10px]">
+                            {prop[0]}{isReadonly && ' ⚡'}
+                          </label>
+                          <input
+                            type="number"
+                            value={Math.round(selectedElement[prop])}
+                            onChange={(e) => !isReadonly && updateElement(selectedId, { [prop]: parseInt(e.target.value) || 0 })}
+                            className={`w-full px-1 py-0.5 bg-[#1a1a2e] rounded border border-gray-700 ${isReadonly ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            readOnly={isReadonly}
+                            title={isReadonly ? 'Otomatik hesaplanır' : ''}
+                          />
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
 
@@ -1841,11 +2157,11 @@ export default function TemplateEditor() {
                   <>
                     <div>
                       <label className="text-gray-400">Sığdırma</label>
-                      <select value={selectedElement.objectFit || 'contain'} onChange={(e) => updateElement(selectedId, { objectFit: e.target.value })}
+                      <select value={selectedElement.objectFit || 'cover'} onChange={(e) => updateElement(selectedId, { objectFit: e.target.value })}
                         className="w-full px-1 py-0.5 bg-[#1a1a2e] rounded border border-gray-700">
-                        <option value="contain">Sığdır</option>
-                        <option value="cover">Kapla</option>
-                        <option value="fill">Doldur</option>
+                        <option value="cover">Kapla (cover)</option>
+                        <option value="contain">Sığdır (contain)</option>
+                        <option value="fill">Uzat (fill)</option>
                       </select>
                     </div>
                   </>
@@ -1859,12 +2175,9 @@ export default function TemplateEditor() {
                       <textarea
                         value={selectedElement.text}
                         onChange={(e) => updateElement(selectedId, { text: e.target.value })}
-                        onPaste={(e) => {
-                          e.stopPropagation()
-                          const text = e.clipboardData.getData('text')
-                          updateElement(selectedId, { text: selectedElement.text + text })
-                          e.preventDefault()
-                        }}
+                        onPaste={(e) => e.stopPropagation()}
+                        onCopy={(e) => e.stopPropagation()}
+                        onCut={(e) => e.stopPropagation()}
                         className="w-full px-2 py-1.5 bg-[#1a1a2e] rounded border border-gray-700 resize-none text-white"
                         rows={3}
                         placeholder="Metni buraya yazın veya yapıştırın..."
@@ -1956,7 +2269,7 @@ export default function TemplateEditor() {
                     </div>
 
                     <div>
-                      <label className="text-gray-400 text-[10px]">Hizalama</label>
+                      <label className="text-gray-400 text-[10px]">Yatay Hizalama</label>
                       <div className="flex gap-1 mt-1">
                         {[
                           { align: 'left', icon: '◀', label: 'Sol' },
@@ -1965,6 +2278,23 @@ export default function TemplateEditor() {
                         ].map(a => (
                           <button key={a.align} onClick={() => updateElement(selectedId, { textAlign: a.align })}
                             className={`flex-1 py-1.5 rounded text-xs ${selectedElement.textAlign === a.align ? 'bg-blue-600' : 'bg-gray-700 hover:bg-gray-600'}`}
+                            title={a.label}>
+                            {a.icon} {a.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-gray-400 text-[10px]">Dikey Hizalama</label>
+                      <div className="flex gap-1 mt-1">
+                        {[
+                          { align: 'top', icon: '▲', label: 'Üst' },
+                          { align: 'center', icon: '◆', label: 'Orta' },
+                          { align: 'bottom', icon: '▼', label: 'Alt' }
+                        ].map(a => (
+                          <button key={a.align} onClick={() => updateElement(selectedId, { verticalAlign: a.align })}
+                            className={`flex-1 py-1.5 rounded text-xs ${(selectedElement.verticalAlign || 'top') === a.align ? 'bg-blue-600' : 'bg-gray-700 hover:bg-gray-600'}`}
                             title={a.label}>
                             {a.icon} {a.label}
                           </button>
