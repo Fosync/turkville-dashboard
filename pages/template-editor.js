@@ -1210,12 +1210,14 @@ export default function TemplateEditor() {
               textAlign: el.textAlign,
               textTransform: el.textTransform || 'none',
               textShadow: el.shadow ? '2px 2px 8px rgba(0,0,0,0.9)' : 'none',
+              WebkitTextStroke: el.textStroke ? `${el.textStrokeWidth || 1}px ${el.textStrokeColor || '#000000'}` : 'none',
               wordWrap: 'break-word',
               overflowWrap: 'break-word',
               whiteSpace: 'pre-wrap'
             }}
             onBlur={(e) => { updateElement(el.id, { text: e.target.value }); setEditingTextId(null) }}
             onClick={(e) => e.stopPropagation()}
+            onPaste={(e) => e.stopPropagation()}
             onKeyDown={(e) => { if (e.key === 'Escape') setEditingTextId(null); e.stopPropagation() }}
           />
         )
@@ -1232,6 +1234,7 @@ export default function TemplateEditor() {
           textAlign: el.textAlign,
           textTransform: el.textTransform || 'none',
           textShadow: el.shadow ? '2px 2px 8px rgba(0,0,0,0.9)' : 'none',
+          WebkitTextStroke: el.textStroke ? `${el.textStrokeWidth || 1}px ${el.textStrokeColor || '#000000'}` : 'none',
           wordWrap: 'break-word',
           overflowWrap: 'break-word',
           whiteSpace: 'pre-wrap',
@@ -1274,15 +1277,16 @@ export default function TemplateEditor() {
             <select
               value={selectedCategory}
               onChange={(e) => handleCategoryChange(e.target.value)}
-              className="px-2 py-1 bg-gradient-to-r from-purple-700 to-pink-700 rounded text-xs border border-purple-500 font-medium"
+              className="px-2 py-1 bg-purple-700 rounded text-xs border border-purple-500 font-medium text-white"
               title="Kategori Badge"
+              style={{ color: 'white' }}
             >
               {categoriesDB.length > 0 ? (
                 categoriesDB.map(cat => (
-                  <option key={cat.key} value={cat.key}>{cat.label_tr || cat.key}</option>
+                  <option key={cat.key} value={cat.key} className="bg-gray-800 text-white">{cat.label_tr || cat.key}</option>
                 ))
               ) : (
-                <option value="HABER">Haber</option>
+                <option value="HABER" className="bg-gray-800 text-white">Haber</option>
               )}
             </select>
 
@@ -1388,10 +1392,10 @@ export default function TemplateEditor() {
               <select
                 value={selectedCategory}
                 onChange={(e) => handleCategoryChange(e.target.value)}
-                className="w-full px-2 py-1.5 bg-[#1a1a2e] rounded border border-gray-700 text-xs"
+                className="w-full px-2 py-1.5 bg-[#1a1a2e] rounded border border-gray-700 text-xs text-white"
               >
                 {categoriesDB.map(cat => (
-                  <option key={cat.key} value={cat.key}>{cat.label_tr || cat.key}</option>
+                  <option key={cat.key} value={cat.key} className="bg-gray-800 text-white">{cat.label_tr || cat.key}</option>
                 ))}
               </select>
             </div>
@@ -1851,23 +1855,72 @@ export default function TemplateEditor() {
                 {selectedElement.type === 'text' && (
                   <>
                     <div>
-                      <label className="text-gray-400">Metin</label>
-                      <textarea value={selectedElement.text} onChange={(e) => updateElement(selectedId, { text: e.target.value })}
-                        className="w-full px-2 py-1 bg-[#1a1a2e] rounded border border-gray-700 resize-none" rows={2} />
+                      <label className="text-gray-400 text-[10px]">Metin İçeriği</label>
+                      <textarea
+                        value={selectedElement.text}
+                        onChange={(e) => updateElement(selectedId, { text: e.target.value })}
+                        onPaste={(e) => {
+                          e.stopPropagation()
+                          const text = e.clipboardData.getData('text')
+                          updateElement(selectedId, { text: selectedElement.text + text })
+                          e.preventDefault()
+                        }}
+                        className="w-full px-2 py-1.5 bg-[#1a1a2e] rounded border border-gray-700 resize-none text-white"
+                        rows={3}
+                        placeholder="Metni buraya yazın veya yapıştırın..."
+                      />
+                    </div>
+
+                    {/* Text Color - Prominent */}
+                    <div className="bg-[#1a1a2e] rounded p-2">
+                      <label className="text-gray-400 text-[10px] font-semibold">Yazı Rengi</label>
+                      <div className="flex items-center gap-2 mt-1">
+                        <input
+                          type="color"
+                          value={selectedElement.color || '#FFFFFF'}
+                          onChange={(e) => updateElement(selectedId, { color: e.target.value })}
+                          className="w-10 h-8 rounded cursor-pointer border border-gray-600"
+                          title="Yazı Rengi Seç"
+                        />
+                        <input
+                          type="text"
+                          value={selectedElement.color || '#FFFFFF'}
+                          onChange={(e) => updateElement(selectedId, { color: e.target.value })}
+                          className="flex-1 px-2 py-1 bg-gray-800 rounded border border-gray-700 text-xs text-white uppercase"
+                          placeholder="#FFFFFF"
+                        />
+                        <div
+                          className="w-8 h-8 rounded border border-gray-600"
+                          style={{ backgroundColor: selectedElement.color || '#FFFFFF' }}
+                          title="Önizleme"
+                        />
+                      </div>
+                      {/* Quick Colors */}
+                      <div className="flex gap-1 mt-2">
+                        {['#FFFFFF', '#000000', '#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF'].map(c => (
+                          <button
+                            key={c}
+                            onClick={() => updateElement(selectedId, { color: c })}
+                            className={`w-5 h-5 rounded border ${selectedElement.color === c ? 'border-white border-2' : 'border-gray-600'}`}
+                            style={{ backgroundColor: c }}
+                            title={c}
+                          />
+                        ))}
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-2">
                       <div>
-                        <label className="text-gray-400">Font</label>
+                        <label className="text-gray-400 text-[10px]">Font</label>
                         <select value={selectedElement.fontFamily} onChange={(e) => updateElement(selectedId, { fontFamily: e.target.value })}
-                          className="w-full px-1 py-0.5 bg-[#1a1a2e] rounded border border-gray-700">
+                          className="w-full px-1 py-0.5 bg-[#1a1a2e] rounded border border-gray-700 text-white">
                           {FONTS.map(f => <option key={f.value} value={f.value}>{f.name}</option>)}
                         </select>
                       </div>
                       <div>
-                        <label className="text-gray-400">Ağırlık</label>
+                        <label className="text-gray-400 text-[10px]">Ağırlık</label>
                         <select value={selectedElement.fontWeight} onChange={(e) => updateElement(selectedId, { fontWeight: parseInt(e.target.value) })}
-                          className="w-full px-1 py-0.5 bg-[#1a1a2e] rounded border border-gray-700">
+                          className="w-full px-1 py-0.5 bg-[#1a1a2e] rounded border border-gray-700 text-white">
                           {FONT_WEIGHTS.map(w => <option key={w.value} value={w.value}>{w.label}</option>)}
                         </select>
                       </div>
@@ -1877,24 +1930,24 @@ export default function TemplateEditor() {
                       <div>
                         <label className="text-gray-400 text-[10px]">Boyut</label>
                         <input type="number" value={selectedElement.fontSize} onChange={(e) => updateElement(selectedId, { fontSize: parseInt(e.target.value) || 36 })}
-                          className="w-full px-1 py-0.5 bg-[#1a1a2e] rounded border border-gray-700" />
+                          className="w-full px-1 py-0.5 bg-[#1a1a2e] rounded border border-gray-700 text-white" />
                       </div>
                       <div>
                         <label className="text-gray-400 text-[10px]">Satır H</label>
                         <input type="number" step="0.1" value={selectedElement.lineHeight} onChange={(e) => updateElement(selectedId, { lineHeight: parseFloat(e.target.value) || 1.2 })}
-                          className="w-full px-1 py-0.5 bg-[#1a1a2e] rounded border border-gray-700" />
+                          className="w-full px-1 py-0.5 bg-[#1a1a2e] rounded border border-gray-700 text-white" />
                       </div>
                       <div>
-                        <label className="text-gray-400 text-[10px]">Harf</label>
+                        <label className="text-gray-400 text-[10px]">Harf Aralık</label>
                         <input type="number" value={selectedElement.letterSpacing || 0} onChange={(e) => updateElement(selectedId, { letterSpacing: parseInt(e.target.value) || 0 })}
-                          className="w-full px-1 py-0.5 bg-[#1a1a2e] rounded border border-gray-700" />
+                          className="w-full px-1 py-0.5 bg-[#1a1a2e] rounded border border-gray-700 text-white" />
                       </div>
                     </div>
 
                     <div>
-                      <label className="text-gray-400">Transform</label>
+                      <label className="text-gray-400 text-[10px]">Yazı Stili</label>
                       <select value={selectedElement.textTransform || 'none'} onChange={(e) => updateElement(selectedId, { textTransform: e.target.value })}
-                        className="w-full px-1 py-0.5 bg-[#1a1a2e] rounded border border-gray-700">
+                        className="w-full px-1 py-0.5 bg-[#1a1a2e] rounded border border-gray-700 text-white">
                         <option value="none">Normal</option>
                         <option value="uppercase">BÜYÜK HARF</option>
                         <option value="lowercase">küçük harf</option>
@@ -1902,22 +1955,56 @@ export default function TemplateEditor() {
                       </select>
                     </div>
 
-                    <div className="flex gap-1">
-                      {['left', 'center', 'right'].map(align => (
-                        <button key={align} onClick={() => updateElement(selectedId, { textAlign: align })}
-                          className={`flex-1 py-1 rounded ${selectedElement.textAlign === align ? 'bg-blue-600' : 'bg-gray-700'}`}>
-                          {align === 'left' ? '◀' : align === 'center' ? '◆' : '▶'}
-                        </button>
-                      ))}
+                    <div>
+                      <label className="text-gray-400 text-[10px]">Hizalama</label>
+                      <div className="flex gap-1 mt-1">
+                        {[
+                          { align: 'left', icon: '◀', label: 'Sol' },
+                          { align: 'center', icon: '◆', label: 'Orta' },
+                          { align: 'right', icon: '▶', label: 'Sağ' }
+                        ].map(a => (
+                          <button key={a.align} onClick={() => updateElement(selectedId, { textAlign: a.align })}
+                            className={`flex-1 py-1.5 rounded text-xs ${selectedElement.textAlign === a.align ? 'bg-blue-600' : 'bg-gray-700 hover:bg-gray-600'}`}
+                            title={a.label}>
+                            {a.icon} {a.label}
+                          </button>
+                        ))}
+                      </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      <input type="color" value={selectedElement.color} onChange={(e) => updateElement(selectedId, { color: e.target.value })} className="w-8 h-6 rounded cursor-pointer border border-gray-700" />
-                      <label className="flex items-center gap-1 cursor-pointer">
-                        <input type="checkbox" checked={selectedElement.shadow || false} onChange={(e) => updateElement(selectedId, { shadow: e.target.checked })} />
-                        Gölge
+                    <div className="flex items-center gap-3 bg-[#1a1a2e] rounded p-2">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" checked={selectedElement.shadow || false} onChange={(e) => updateElement(selectedId, { shadow: e.target.checked })} className="w-4 h-4" />
+                        <span className="text-xs">Gölge</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" checked={selectedElement.textStroke || false} onChange={(e) => updateElement(selectedId, { textStroke: e.target.checked })} className="w-4 h-4" />
+                        <span className="text-xs">Kenarlık</span>
                       </label>
                     </div>
+
+                    {/* Text Stroke Color */}
+                    {selectedElement.textStroke && (
+                      <div className="flex items-center gap-2">
+                        <label className="text-gray-400 text-[10px]">Kenarlık Rengi:</label>
+                        <input
+                          type="color"
+                          value={selectedElement.textStrokeColor || '#000000'}
+                          onChange={(e) => updateElement(selectedId, { textStrokeColor: e.target.value })}
+                          className="w-6 h-6 rounded cursor-pointer border border-gray-600"
+                        />
+                        <input
+                          type="number"
+                          value={selectedElement.textStrokeWidth || 1}
+                          onChange={(e) => updateElement(selectedId, { textStrokeWidth: parseInt(e.target.value) || 1 })}
+                          className="w-16 px-1 py-0.5 bg-gray-800 rounded border border-gray-700 text-xs text-white"
+                          min="1"
+                          max="10"
+                          title="Kenarlık Kalınlığı"
+                        />
+                        <span className="text-[10px] text-gray-500">px</span>
+                      </div>
+                    )}
                   </>
                 )}
 
