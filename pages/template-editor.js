@@ -9,7 +9,7 @@ import html2canvas from 'html2canvas'
 // Yazı kutusunun yüksekliğini yazıya göre otomatik hesaplar
 // ============================================================
 const calculateTextHeight = (text, width, fontSize, lineHeight = 1.2, fontFamily = 'Gilroy', fontWeight = 800, letterSpacing = 0) => {
-  if (!text || !width || !fontSize) return fontSize * lineHeight
+  if (!text || !width || !fontSize) return fontSize * lineHeight + 40
 
   // Tarayıcıda canvas ile ölç
   if (typeof document !== 'undefined') {
@@ -20,7 +20,7 @@ const calculateTextHeight = (text, width, fontSize, lineHeight = 1.2, fontFamily
     const words = text.split(/\s+/)
     let line = ''
     let lineCount = 0
-    const maxWidth = width - 10 // padding için biraz margin
+    const maxWidth = width - 20 // padding için margin
 
     for (const word of words) {
       const testLine = line ? line + ' ' + word : word
@@ -41,11 +41,14 @@ const calculateTextHeight = (text, width, fontSize, lineHeight = 1.2, fontFamily
     const newlineCount = (text.match(/\n/g) || []).length
     lineCount += newlineCount
 
-    return Math.max(lineCount, 1) * fontSize * lineHeight + 10 // padding
+    // Yükseklik = satır sayısı × satır yüksekliği + ekstra padding (descender için)
+    const textHeight = Math.max(lineCount, 1) * fontSize * lineHeight
+    const extraPadding = fontSize * 0.5 // Font descender ve güvenlik marjı için
+    return textHeight + extraPadding
   }
 
   // SSR fallback
-  return fontSize * lineHeight * 3
+  return fontSize * lineHeight * 3 + 40
 }
 
 // Auto-fit text component - metin kutuya sığacak şekilde otomatik küçülür
@@ -79,7 +82,8 @@ const AutoFitText = ({ text, baseFontSize, scale, style, verticalAlign = 'top' }
   return (
     <div
       ref={containerRef}
-      className={`w-full h-full flex flex-col ${justifyClass} pointer-events-none overflow-hidden`}
+      className={`w-full h-full flex flex-col ${justifyClass} pointer-events-none`}
+      style={{ overflow: 'visible' }}
     >
       <div
         ref={textRef}
@@ -243,7 +247,7 @@ export default function TemplateEditor() {
       gradientStartPos: 0, gradientEndPos: 60,
       gradientDirection: 'to top' },
     { id: 'badge', type: 'image', name: '[UI] Etiket', src: '/images/Turkville_haber.png',
-      x: 61, y: 120, width: 181, height: 92, zIndex: 10, opacity: 100, locked: false, visible: true, rotation: 0, objectFit: 'contain' },
+      x: 61, y: 120, width: 181, height: 92, zIndex: 10, opacity: 100, locked: false, visible: true, rotation: 0, objectFit: 'cover' },
     { id: 'title', type: 'text', name: '[TXT] Başlık', text: 'ÖRNEK ETKİNLİK BAŞLIĞI',
       x: 50, y: canvasHeight - 152 - 380, width: 980, height: 380, zIndex: 11, opacity: 100,
       fontSize: 64, fontWeight: 800, fontFamily: "'Gilroy', sans-serif", color: '#FFFFEB',
@@ -251,7 +255,7 @@ export default function TemplateEditor() {
       locked: false, visible: true, rotation: 0, shadow: true },
     { id: 'banner', type: 'image', name: '[UI] Banner', src: '/images/banner.png',
       x: 50, y: 1172, width: 980, height: 107, zIndex: 12,
-      opacity: 100, locked: false, visible: true, rotation: 0, objectFit: 'contain' }
+      opacity: 100, locked: false, visible: true, rotation: 0, objectFit: 'cover' }
   ]
 
   const getTextElements = () => [
@@ -260,7 +264,7 @@ export default function TemplateEditor() {
     { id: 'colorBg', type: 'color', name: '[BG] Renk', color: bgColor,
       x: 0, y: 0, width: canvasWidth, height: canvasHeight, zIndex: 1, opacity: 100, locked: false, visible: true },
     { id: 'badge', type: 'image', name: '[UI] Etiket', src: '/images/Turkville_haber.png',
-      x: 61, y: 120, width: 181, height: 92, zIndex: 10, opacity: 100, locked: false, visible: true, rotation: 0, objectFit: 'contain' },
+      x: 61, y: 120, width: 181, height: 92, zIndex: 10, opacity: 100, locked: false, visible: true, rotation: 0, objectFit: 'cover' },
     { id: 'title', type: 'text', name: '[TXT] İçerik', text: 'UZUN METİN HABERİ',
       x: 50, y: 250, width: 980, height: canvasHeight - 410, zIndex: 11, opacity: 100,
       fontSize: 56, fontWeight: 800, fontFamily: "'Gilroy', sans-serif", color: '#FFFFEB',
@@ -268,7 +272,7 @@ export default function TemplateEditor() {
       locked: false, visible: true, rotation: 0, shadow: false },
     { id: 'banner', type: 'image', name: '[UI] Banner', src: '/images/banner.png',
       x: 50, y: 1172, width: 980, height: 107, zIndex: 12,
-      opacity: 100, locked: false, visible: true, rotation: 0, objectFit: 'contain' }
+      opacity: 100, locked: false, visible: true, rotation: 0, objectFit: 'cover' }
   ]
 
   const [elements, setElements] = useState(() => getVisualElements())
