@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1350" width="1080" height="1350">
+  <rect id="background" x="0" y="0" width="1080" height="1350" fill="#3b82f6"/>
+  <circle id="circle1" cx="540" cy="400" r="150" fill="#ef4444"/>
+  <rect id="box1" x="200" y="800" width="300" height="200" fill="#22c55e" rx="20"/>
+  <text id="title" x="540" y="700" font-size="72" fill="#ffffff" text-anchor="middle">TEST BAŞLIK</text>
+  <ellipse id="ellipse1" cx="800" cy="300" rx="100" ry="60" fill="#f59e0b"/>
+  <line id="line1" x1="100" y1="1200" x2="980" y2="1200" stroke="#ffffff" stroke-width="4"/>
+  <path id="path1" d="M 100 100 L 200 200 L 100 200 Z" fill="#8b5cf6"/>
+</svg>

@@ -656,20 +656,37 @@ export default function TemplateEditor() {
   // SVG Parser - SVG'yi katmanlara ayır
   const parseSvgToLayers = (svgContent, fileName) => {
     try {
+      console.log('Parsing SVG...')
       const parser = new DOMParser()
       const doc = parser.parseFromString(svgContent, 'image/svg+xml')
       const svg = doc.querySelector('svg')
-      if (!svg) return null
+
+      // Parse hatası kontrolü
+      const parseError = doc.querySelector('parsererror')
+      if (parseError) {
+        console.error('SVG Parse Error:', parseError.textContent)
+        return null
+      }
+
+      if (!svg) {
+        console.error('No SVG element found')
+        return null
+      }
 
       // SVG viewBox veya width/height al
-      const viewBox = svg.getAttribute('viewBox')?.split(' ').map(Number) || [0, 0, 1080, 1350]
+      const viewBoxAttr = svg.getAttribute('viewBox')
+      const viewBox = viewBoxAttr ? viewBoxAttr.split(/[\s,]+/).map(Number) : [0, 0, 1080, 1350]
       const svgWidth = parseFloat(svg.getAttribute('width')) || viewBox[2] || 1080
       const svgHeight = parseFloat(svg.getAttribute('height')) || viewBox[3] || 1350
+
+      console.log('SVG dimensions:', { svgWidth, svgHeight, viewBox })
+      console.log('Canvas dimensions:', { canvasWidth, canvasHeight })
 
       // Scale factor - canvas boyutuna göre
       const scaleX = canvasWidth / svgWidth
       const scaleY = canvasHeight / svgHeight
       const scaleFactor = Math.min(scaleX, scaleY, 1)
+      console.log('Scale factor:', scaleFactor)
 
       const newElements = []
       let layerIndex = 0
@@ -816,14 +833,17 @@ export default function TemplateEditor() {
         }
         else if (['path', 'polygon', 'polyline'].includes(tagName)) {
           // Path/Polygon/Polyline - SVG olarak embed et
-          const bbox = el.getBBox ? el.getBBox() : { x: 0, y: 0, width: 100, height: 100 }
+          // getBBox DOM dışında çalışmaz, manuel hesapla veya tam SVG kullan
           const serializer = new XMLSerializer()
 
-          // Element'i ayrı bir SVG olarak wrap et
+          // Tüm SVG'yi viewBox ile wrap et
           const wrapperSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
-          wrapperSvg.setAttribute('viewBox', `${bbox.x} ${bbox.y} ${bbox.width} ${bbox.height}`)
-          wrapperSvg.setAttribute('width', bbox.width)
-          wrapperSvg.setAttribute('height', bbox.height)
+          wrapperSvg.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
+          wrapperSvg.setAttribute('viewBox', `0 0 ${svgWidth} ${svgHeight}`)
+          wrapperSvg.setAttribute('width', svgWidth)
+          wrapperSvg.setAttribute('height', svgHeight)
+          wrapperSvg.setAttribute('preserveAspectRatio', 'xMidYMid meet')
+
           const clonedEl = el.cloneNode(true)
           wrapperSvg.appendChild(clonedEl)
 
@@ -832,11 +852,11 @@ export default function TemplateEditor() {
 
           newElements.push({
             id, name: `[SVG] ${elName}`, type: 'image',
-            x: bbox.x * scaleFactor, y: bbox.y * scaleFactor,
-            width: bbox.width * scaleFactor, height: bbox.height * scaleFactor,
+            x: 0, y: 0,
+            width: canvasWidth, height: canvasHeight,
             src: svgBase64,
             objectFit: 'contain',
-            zIndex: elements.length + layerIndex,
+            zIndex: 50 + layerIndex,
             opacity: parseFloat(el.getAttribute('opacity') || 1) * 100,
             locked: false, visible: true, rotation: 0
           })
@@ -844,7 +864,14 @@ export default function TemplateEditor() {
       }
 
       // SVG'nin tüm çocuklarını işle
-      Array.from(svg.children).forEach(child => processElement(child))
+      console.log('SVG children count:', svg.children.length)
+      Array.from(svg.children).forEach(child => {
+        console.log('Processing child:', child.tagName)
+        processElement(child)
+      })
+
+      console.log('Total parsed elements:', newElements.length)
+      newElements.forEach((el, i) => console.log(`  ${i}: ${el.name} (${el.type}) at ${el.x},${el.y} size ${el.width}x${el.height}`))
 
       return newElements.length > 0 ? newElements : null
     } catch (error) {
@@ -900,15 +927,35 @@ export default function TemplateEditor() {
 
   // SVG'yi katmanlara ayırarak import et
   const importSvgAsLayers = () => {
+    console.log('=== SVG IMPORT START ===')
+    console.log('SVG Content length:', svgImportModal.content.length)
+
     const layers = parseSvgToLayers(svgImportModal.content, svgImportModal.fileName)
+    console.log('Parsed layers:', layers)
+
     if (layers && layers.length > 0) {
+      // zIndex'leri mevcut element sayısına göre ayarla
+      const currentElementCount = elements.length
+      const adjustedLayers = layers.map((layer, idx) => ({
+        ...layer,
+        zIndex: currentElementCount + idx + 1
+      }))
+
+      console.log('Adjusted layers:', adjustedLayers)
+
       setElements(prev => {
-        const newElements = [...prev, ...layers]
+        const newElements = [...prev, ...adjustedLayers]
+        console.log('New elements total:', newElements.length)
         saveHistory(newElements)
         return newElements
       })
-      alert(`${layers.length} katman eklendi!`)
+
+      // Seçimi temizle ve ilk yeni katmanı seç
+      setSelectedIds([adjustedLayers[0].id])
+
+      console.log('=== SVG IMPORT SUCCESS ===')
     } else {
+      console.log('=== SVG IMPORT FAILED - No layers ===')
       alert('SVG katmanlara ayrılamadı. Tek görsel olarak ekleniyor.')
       importSvgAsSingleImage()
     }
