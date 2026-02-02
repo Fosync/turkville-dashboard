@@ -646,13 +646,21 @@ export default function TemplateEditor() {
     }
   }
 
-  // File upload
+  // File upload - PNG, JPEG, SVG, PDF destekli
   const handleFileUpload = (e) => {
     Array.from(e.target.files || []).forEach(file => {
-      if (!file.type.startsWith('image/')) return
+      const validTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/svg+xml', 'image/webp', 'image/gif', 'application/pdf']
+      if (!validTypes.includes(file.type) && !file.type.startsWith('image/')) return
+
       const reader = new FileReader()
       reader.onload = (ev) => {
-        setUploadedImages(prev => [...prev, { id: Date.now(), name: file.name.replace(/\.[^/.]+$/, ''), src: ev.target.result }])
+        const fileExt = file.name.split('.').pop().toLowerCase()
+        setUploadedImages(prev => [...prev, {
+          id: Date.now(),
+          name: file.name.replace(/\.[^/.]+$/, ''),
+          src: ev.target.result,
+          type: fileExt // svg, png, jpg, pdf
+        }])
       }
       reader.readAsDataURL(file)
     })
@@ -970,9 +978,9 @@ export default function TemplateEditor() {
             </div>
 
             <div className="flex items-center gap-1 border-l border-gray-600 pl-2">
-              <button onClick={() => setShowGrid(!showGrid)} className={`p-1 rounded text-xs ${showGrid ? 'bg-blue-600' : 'hover:bg-gray-700'}`} title="Grid">▦</button>
-              <button onClick={() => setShowRuler(!showRuler)} className={`p-1 rounded text-xs ${showRuler ? 'bg-blue-600' : 'hover:bg-gray-700'}`} title="Cetvel">📏</button>
-              <button onClick={() => setSnapToGrid(!snapToGrid)} className={`px-1.5 py-1 rounded text-xs ${snapToGrid ? 'bg-blue-600' : 'hover:bg-gray-700'}`}>⊞</button>
+              <button onClick={() => setShowGrid(!showGrid)} className={`p-1 rounded text-xs ${showGrid ? 'bg-blue-600' : 'hover:bg-gray-700'}`} title="Grid Göster/Gizle">▦</button>
+              <button onClick={() => setShowRuler(!showRuler)} className={`p-1 rounded text-xs ${showRuler ? 'bg-blue-600' : 'hover:bg-gray-700'}`} title="Cetvel Göster/Gizle">📏</button>
+              <button onClick={() => setSnapToGrid(!snapToGrid)} className={`px-1.5 py-1 rounded text-xs ${snapToGrid ? 'bg-blue-600' : 'hover:bg-gray-700'}`} title="Grid'e Yapış">⊞</button>
             </div>
 
             {selectedId && (
@@ -988,19 +996,19 @@ export default function TemplateEditor() {
             )}
 
             <div className="flex items-center gap-1 border-l border-gray-600 pl-2">
-              <button onClick={() => setScale(prev => Math.max(prev - 0.1, 0.1))} className="p-1 hover:bg-gray-700 rounded text-xs">−</button>
-              <span className="text-xs w-10 text-center">{Math.round(scale * 100)}%</span>
-              <button onClick={() => setScale(prev => Math.min(prev + 0.1, 2))} className="p-1 hover:bg-gray-700 rounded text-xs">+</button>
+              <button onClick={() => setScale(prev => Math.max(prev - 0.1, 0.1))} className="p-1 hover:bg-gray-700 rounded text-xs" title="Uzaklaştır (Ctrl+Scroll)">−</button>
+              <span className="text-xs w-10 text-center" title="Yakınlaştırma Oranı">{Math.round(scale * 100)}%</span>
+              <button onClick={() => setScale(prev => Math.min(prev + 0.1, 2))} className="p-1 hover:bg-gray-700 rounded text-xs" title="Yakınlaştır (Ctrl+Scroll)">+</button>
               <button onClick={fitToScreen} className="p-1 hover:bg-gray-700 rounded text-xs ml-1" title="Ekrana Sığdır">⊡</button>
             </div>
           </div>
 
           <div className="flex items-center gap-1">
-            <button onClick={() => setShowAIModal(true)} className="px-2 py-1 bg-purple-600 rounded text-xs hover:bg-purple-500">🤖 AI</button>
-            <button onClick={() => { setShowTemplateList(!showTemplateList); loadTemplates() }} className="px-2 py-1 bg-gray-700 rounded text-xs hover:bg-gray-600">📁</button>
-            <button onClick={saveTemplate} className="px-2 py-1 bg-green-600 rounded text-xs hover:bg-green-500">💾</button>
-            <button onClick={() => setShowExportModal(true)} className="px-2 py-1 bg-blue-600 rounded text-xs hover:bg-blue-500">📥 Export</button>
-            <a href="/" className="px-2 py-1 bg-gray-700 rounded text-xs hover:bg-gray-600">🏠</a>
+            <button onClick={() => setShowAIModal(true)} className="px-2 py-1 bg-purple-600 rounded text-xs hover:bg-purple-500" title="AI ile Görsel Oluştur">🤖 AI</button>
+            <button onClick={() => { setShowTemplateList(!showTemplateList); loadTemplates() }} className="px-2 py-1 bg-gray-700 rounded text-xs hover:bg-gray-600" title="Kayıtlı Şablonlar">📁</button>
+            <button onClick={saveTemplate} className="px-2 py-1 bg-green-600 rounded text-xs hover:bg-green-500" title="Şablonu Kaydet">💾</button>
+            <button onClick={() => setShowExportModal(true)} className="px-2 py-1 bg-blue-600 rounded text-xs hover:bg-blue-500" title="Görsel Olarak İndir">📥 Export</button>
+            <a href="/" className="px-2 py-1 bg-gray-700 rounded text-xs hover:bg-gray-600" title="Ana Sayfaya Dön">🏠</a>
           </div>
         </header>
 
@@ -1009,10 +1017,10 @@ export default function TemplateEditor() {
           <div className="w-56 bg-[#16213e] border-r border-gray-700 flex flex-col text-xs">
             {/* Add buttons */}
             <div className="p-2 border-b border-gray-700 grid grid-cols-4 gap-1">
-              <button onClick={() => addElement('image')} className="py-1.5 bg-blue-600 rounded hover:bg-blue-500" title="Görsel">🖼</button>
-              <button onClick={() => addElement('text')} className="py-1.5 bg-green-600 rounded hover:bg-green-500" title="Metin">T</button>
-              <button onClick={() => addElement('rect')} className="py-1.5 bg-orange-600 rounded hover:bg-orange-500" title="Dikdörtgen">▭</button>
-              <button onClick={() => addElement('circle')} className="py-1.5 bg-pink-600 rounded hover:bg-pink-500" title="Daire">○</button>
+              <button onClick={() => addElement('image')} className="py-1.5 bg-blue-600 rounded hover:bg-blue-500" title="Görsel Ekle (PNG, JPG, SVG)">🖼</button>
+              <button onClick={() => addElement('text')} className="py-1.5 bg-green-600 rounded hover:bg-green-500" title="Metin Ekle">T</button>
+              <button onClick={() => addElement('rect')} className="py-1.5 bg-orange-600 rounded hover:bg-orange-500" title="Dikdörtgen Ekle">▭</button>
+              <button onClick={() => addElement('circle')} className="py-1.5 bg-pink-600 rounded hover:bg-pink-500" title="Daire Ekle">○</button>
             </div>
 
             {/* Layers */}
@@ -1032,7 +1040,7 @@ export default function TemplateEditor() {
                   className={`group mb-0.5 px-1.5 py-1 rounded flex items-center gap-1 cursor-pointer transition-all ${
                     selectedIds.includes(el.id) ? 'bg-blue-600' : 'bg-[#1a1a2e] hover:bg-gray-700/50'
                   } ${el.locked ? 'opacity-60' : ''} ${draggedLayerId === el.id ? 'opacity-50' : ''}`}>
-                  <button onClick={(e) => { e.stopPropagation(); updateElement(el.id, { visible: !el.visible }) }} className={el.visible ? 'text-blue-400' : 'text-gray-600'}>
+                  <button onClick={(e) => { e.stopPropagation(); updateElement(el.id, { visible: !el.visible }) }} className={el.visible ? 'text-blue-400' : 'text-gray-600'} title={el.visible ? 'Gizle' : 'Göster'}>
                     {el.visible ? '👁' : '○'}
                   </button>
                   {renamingId === el.id ? (
@@ -1043,7 +1051,7 @@ export default function TemplateEditor() {
                   ) : (
                     <span className="flex-1 truncate">{el.name}</span>
                   )}
-                  <button onClick={(e) => { e.stopPropagation(); updateElement(el.id, { locked: !el.locked }) }} className={el.locked ? 'text-yellow-400' : 'text-gray-500 opacity-0 group-hover:opacity-100'}>
+                  <button onClick={(e) => { e.stopPropagation(); updateElement(el.id, { locked: !el.locked }) }} className={el.locked ? 'text-yellow-400' : 'text-gray-500 opacity-0 group-hover:opacity-100'} title={el.locked ? 'Kilidi Aç' : 'Kilitle'}>
                     {el.locked ? '🔒' : '🔓'}
                   </button>
                 </div>
@@ -1070,12 +1078,14 @@ export default function TemplateEditor() {
                 <button
                   onClick={() => setLibraryTab('library')}
                   className={`flex-1 py-1.5 text-xs font-semibold ${libraryTab === 'library' ? 'bg-blue-600 text-white' : 'bg-[#1a1a2e] text-gray-400 hover:bg-gray-700'}`}
+                  title="Tasarım Kütüphanesi - Badge, Banner, Gradient vb."
                 >
                   📚 Kütüphane
                 </button>
                 <button
                   onClick={() => setLibraryTab('uploads')}
                   className={`flex-1 py-1.5 text-xs font-semibold ${libraryTab === 'uploads' ? 'bg-blue-600 text-white' : 'bg-[#1a1a2e] text-gray-400 hover:bg-gray-700'}`}
+                  title="Yüklediğiniz Görseller (PNG, JPG, SVG, PDF)"
                 >
                   📤 Yüklemeler
                 </button>
@@ -1086,18 +1096,19 @@ export default function TemplateEditor() {
                   {/* Type Filters */}
                   <div className="flex flex-wrap gap-1 mb-2">
                     {[
-                      { key: 'all', label: 'Tümü', icon: '📁' },
-                      { key: 'badge', label: 'Badge', icon: '🏷️' },
-                      { key: 'banner', label: 'Banner', icon: '🎫' },
-                      { key: 'gradient', label: 'Gradient', icon: '🌈' },
-                      { key: 'logo', label: 'Logo', icon: '⭐' },
-                      { key: 'background', label: 'Arka Plan', icon: '🖼️' },
-                      { key: 'icon', label: 'İkon', icon: '💠' }
+                      { key: 'all', label: 'Tümü', icon: '📁', desc: 'Tüm Tasarım Öğeleri' },
+                      { key: 'badge', label: 'Badge', icon: '🏷️', desc: 'Kategori Etiketleri - Tıkla: Badge değişir' },
+                      { key: 'banner', label: 'Banner', icon: '🎫', desc: 'Alt Banner - Tıkla: Banner değişir' },
+                      { key: 'gradient', label: 'Gradient', icon: '🌈', desc: 'Renk Geçişleri - Tıkla: Overlay değişir' },
+                      { key: 'logo', label: 'Logo', icon: '⭐', desc: 'Logo Görselleri' },
+                      { key: 'background', label: 'Arka Plan', icon: '🖼️', desc: 'Arka Plan Görselleri - Tıkla: Arka plan değişir' },
+                      { key: 'icon', label: 'İkon', icon: '💠', desc: 'İkon ve Semboller' }
                     ].map(filter => (
                       <button
                         key={filter.key}
                         onClick={() => setLibraryFilter(filter.key)}
                         className={`px-1.5 py-0.5 rounded text-[10px] ${libraryFilter === filter.key ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}
+                        title={filter.desc}
                       >
                         {filter.icon} {filter.label}
                       </button>
@@ -1116,7 +1127,7 @@ export default function TemplateEditor() {
                         }}
                         onClick={() => addLibraryAsset(asset)}
                         className="aspect-square bg-gray-700 rounded overflow-hidden cursor-pointer hover:ring-2 ring-blue-500 relative group"
-                        title={`${asset.name} (${asset.type})`}
+                        title={`${asset.name}\nTip: ${asset.type}\nTıkla: ${asset.type === 'badge' ? 'Badge değişir' : asset.type === 'banner' ? 'Banner değişir' : asset.type === 'gradient' ? 'Overlay değişir' : asset.type === 'background' ? 'Arka plan değişir' : 'Canvas\'a eklenir'}`}
                       >
                         <img src={asset.file_path} alt={asset.name} className="w-full h-full object-contain p-1" />
                         <div className="absolute inset-x-0 bottom-0 bg-black/70 text-[8px] text-center py-0.5 opacity-0 group-hover:opacity-100 truncate px-0.5">
@@ -1143,7 +1154,7 @@ export default function TemplateEditor() {
                     <span className="text-gray-500 text-[10px]">Yüklenen Görseller</span>
                     <button onClick={() => fileInputRef.current?.click()} className="text-blue-400 hover:text-blue-300 text-[10px]">+ Ekle</button>
                   </div>
-                  <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handleFileUpload} className="hidden" />
+                  <input ref={fileInputRef} type="file" accept="image/*,.svg,.pdf,application/pdf" multiple onChange={handleFileUpload} className="hidden" />
                   {uploadedImages.length > 0 ? (
                     <div className="grid grid-cols-3 gap-1 max-h-32 overflow-auto">
                       {uploadedImages.map(img => (
