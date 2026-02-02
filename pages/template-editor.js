@@ -806,6 +806,7 @@ export default function TemplateEditor() {
   // Element click
   const handleElementClick = (e, id) => {
     e.stopPropagation()
+    closeContextMenu() // Sol tıkla context menu kapat
     if (e.shiftKey) {
       setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id])
     } else {
