@@ -114,6 +114,12 @@ export default function TemplateEditor() {
   const [clipboard, setClipboard] = useState(null)
   const [dragOverCanvas, setDragOverCanvas] = useState(false)
 
+  // Design Library
+  const [libraryAssets, setLibraryAssets] = useState([])
+  const [libraryFilter, setLibraryFilter] = useState('all')
+  const [libraryTab, setLibraryTab] = useState('library') // 'library' | 'uploads'
+  const [selectedCategory, setSelectedCategory] = useState('HABER')
+
   // Template
   const [templateMode, setTemplateMode] = useState('visual')
   const [bgColor, setBgColor] = useState('#dc2626')
@@ -190,11 +196,83 @@ export default function TemplateEditor() {
     fetchCategories()
   }, [])
 
+  // Design Library assets'lerini çek
+  useEffect(() => {
+    const fetchLibraryAssets = async () => {
+      try {
+        const response = await fetch('/api/design-assets')
+        const data = await response.json()
+        setLibraryAssets(data.assets || [])
+      } catch (error) {
+        console.error('fetchLibraryAssets error:', error)
+      }
+    }
+    fetchLibraryAssets()
+  }, [])
+
   // Kategori badge'ini bul
   const getCategoryBadge = (key) => {
     const cat = categoriesDB.find(c => c.key === key)
     return cat?.badge_path || '/images/turkvillelogo.png'
   }
+
+  // Kategori değişince badge'i güncelle
+  const handleCategoryChange = (categoryKey) => {
+    setSelectedCategory(categoryKey)
+    const badgePath = getCategoryBadge(categoryKey)
+    // Badge elementini güncelle
+    setElements(prev => prev.map(el => {
+      if (el.id === 'badge') {
+        return { ...el, src: badgePath }
+      }
+      return el
+    }))
+  }
+
+  // Kütüphaneden asset ekle
+  const addLibraryAsset = (asset) => {
+    if (asset.type === 'badge') {
+      // Badge'i değiştir
+      setElements(prev => prev.map(el => {
+        if (el.id === 'badge') {
+          return { ...el, src: asset.file_path, name: `[UI] ${asset.name}` }
+        }
+        return el
+      }))
+    } else if (asset.type === 'banner') {
+      // Banner'ı değiştir
+      setElements(prev => prev.map(el => {
+        if (el.id === 'banner') {
+          return { ...el, src: asset.file_path, name: `[UI] ${asset.name}` }
+        }
+        return el
+      }))
+    } else if (asset.type === 'gradient') {
+      // Gradient overlay olarak ekle
+      setElements(prev => prev.map(el => {
+        if (el.id === 'gradient') {
+          return { ...el, type: 'overlay', src: asset.file_path, name: `[FX] ${asset.name}` }
+        }
+        return el
+      }))
+    } else if (asset.type === 'background') {
+      // Arka plan olarak ayarla
+      setBackgroundUrl(asset.file_path)
+    } else {
+      // Diğerleri yeni element olarak ekle
+      addElement('image', {
+        src: asset.file_path,
+        name: asset.name,
+        width: asset.width || 200,
+        height: asset.height || 200
+      })
+    }
+  }
+
+  // Filtrelenmiş kütüphane assets
+  const filteredLibraryAssets = libraryFilter === 'all'
+    ? libraryAssets
+    : libraryAssets.filter(a => a.type === libraryFilter)
 
   // Load background image from localStorage (from "Gorsel Olustur")
   useEffect(() => {
@@ -860,6 +938,22 @@ export default function TemplateEditor() {
               {PRESET_SIZES.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
 
+            {/* Quick Category Badge Selector */}
+            <select
+              value={selectedCategory}
+              onChange={(e) => handleCategoryChange(e.target.value)}
+              className="px-2 py-1 bg-gradient-to-r from-purple-700 to-pink-700 rounded text-xs border border-purple-500 font-medium"
+              title="Kategori Badge"
+            >
+              {categoriesDB.length > 0 ? (
+                categoriesDB.map(cat => (
+                  <option key={cat.key} value={cat.key}>{cat.name_tr}</option>
+                ))
+              ) : (
+                <option value="HABER">Haber</option>
+              )}
+            </select>
+
             {templateMode === 'text' && (
               <div className="flex items-center gap-1 ml-2">
                 {BG_COLORS.map(c => (
@@ -956,36 +1050,125 @@ export default function TemplateEditor() {
               ))}
             </div>
 
-            {/* Assets */}
+            {/* Category Selector */}
             <div className="border-t border-gray-700 p-2">
-              <div className="text-gray-500 mb-1.5 font-semibold flex items-center justify-between">
-                <span>GÖRSELLER</span>
-                <button onClick={() => fileInputRef.current?.click()} className="text-blue-400 hover:text-blue-300">+ Ekle</button>
+              <div className="text-gray-500 mb-1.5 font-semibold">KATEGORİ</div>
+              <select
+                value={selectedCategory}
+                onChange={(e) => handleCategoryChange(e.target.value)}
+                className="w-full px-2 py-1.5 bg-[#1a1a2e] rounded border border-gray-700 text-xs"
+              >
+                {categoriesDB.map(cat => (
+                  <option key={cat.key} value={cat.key}>{cat.name_tr}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Library / Uploads Tabs */}
+            <div className="border-t border-gray-700">
+              <div className="flex">
+                <button
+                  onClick={() => setLibraryTab('library')}
+                  className={`flex-1 py-1.5 text-xs font-semibold ${libraryTab === 'library' ? 'bg-blue-600 text-white' : 'bg-[#1a1a2e] text-gray-400 hover:bg-gray-700'}`}
+                >
+                  📚 Kütüphane
+                </button>
+                <button
+                  onClick={() => setLibraryTab('uploads')}
+                  className={`flex-1 py-1.5 text-xs font-semibold ${libraryTab === 'uploads' ? 'bg-blue-600 text-white' : 'bg-[#1a1a2e] text-gray-400 hover:bg-gray-700'}`}
+                >
+                  📤 Yüklemeler
+                </button>
               </div>
-              <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handleFileUpload} className="hidden" />
-              {uploadedImages.length > 0 ? (
-                <div className="grid grid-cols-3 gap-1 max-h-24 overflow-auto">
-                  {uploadedImages.map(img => (
-                    <div key={img.id}
-                      draggable
-                      onDragStart={(e) => { e.dataTransfer.setData('image-src', img.src); e.dataTransfer.setData('image-name', img.name) }}
-                      onClick={() => addElement('image', { src: img.src, name: img.name })}
-                      className="aspect-square bg-gray-700 rounded overflow-hidden cursor-pointer hover:ring-2 ring-blue-500" title={img.name}>
-                      <img src={img.src} alt="" className="w-full h-full object-cover" />
-                    </div>
-                  ))}
+
+              {libraryTab === 'library' ? (
+                <div className="p-2">
+                  {/* Type Filters */}
+                  <div className="flex flex-wrap gap-1 mb-2">
+                    {[
+                      { key: 'all', label: 'Tümü', icon: '📁' },
+                      { key: 'badge', label: 'Badge', icon: '🏷️' },
+                      { key: 'banner', label: 'Banner', icon: '🎫' },
+                      { key: 'gradient', label: 'Gradient', icon: '🌈' },
+                      { key: 'logo', label: 'Logo', icon: '⭐' },
+                      { key: 'background', label: 'Arka Plan', icon: '🖼️' },
+                      { key: 'icon', label: 'İkon', icon: '💠' }
+                    ].map(filter => (
+                      <button
+                        key={filter.key}
+                        onClick={() => setLibraryFilter(filter.key)}
+                        className={`px-1.5 py-0.5 rounded text-[10px] ${libraryFilter === filter.key ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}
+                      >
+                        {filter.icon} {filter.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Assets Grid */}
+                  <div className="grid grid-cols-3 gap-1 max-h-40 overflow-auto">
+                    {filteredLibraryAssets.map(asset => (
+                      <div
+                        key={asset.id}
+                        draggable
+                        onDragStart={(e) => {
+                          e.dataTransfer.setData('image-src', asset.file_path)
+                          e.dataTransfer.setData('image-name', asset.name)
+                        }}
+                        onClick={() => addLibraryAsset(asset)}
+                        className="aspect-square bg-gray-700 rounded overflow-hidden cursor-pointer hover:ring-2 ring-blue-500 relative group"
+                        title={`${asset.name} (${asset.type})`}
+                      >
+                        <img src={asset.file_path} alt={asset.name} className="w-full h-full object-contain p-1" />
+                        <div className="absolute inset-x-0 bottom-0 bg-black/70 text-[8px] text-center py-0.5 opacity-0 group-hover:opacity-100 truncate px-0.5">
+                          {asset.name}
+                        </div>
+                        <div className="absolute top-0.5 right-0.5 text-[8px] bg-black/50 px-1 rounded">
+                          {asset.type === 'badge' ? '🏷️' : asset.type === 'banner' ? '🎫' : asset.type === 'gradient' ? '🌈' : asset.type === 'logo' ? '⭐' : '📁'}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {filteredLibraryAssets.length === 0 && (
+                    <p className="text-gray-500 text-center py-3 text-[10px]">Bu kategoride asset yok</p>
+                  )}
+
+                  <div className="mt-2 text-[10px] text-gray-500 text-center">
+                    {filteredLibraryAssets.length} asset • Tıkla veya sürükle
+                  </div>
                 </div>
               ) : (
-                <p className="text-gray-600 text-center py-2">Görsel yükleyin</p>
+                <div className="p-2">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-gray-500 text-[10px]">Yüklenen Görseller</span>
+                    <button onClick={() => fileInputRef.current?.click()} className="text-blue-400 hover:text-blue-300 text-[10px]">+ Ekle</button>
+                  </div>
+                  <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handleFileUpload} className="hidden" />
+                  {uploadedImages.length > 0 ? (
+                    <div className="grid grid-cols-3 gap-1 max-h-32 overflow-auto">
+                      {uploadedImages.map(img => (
+                        <div key={img.id}
+                          draggable
+                          onDragStart={(e) => { e.dataTransfer.setData('image-src', img.src); e.dataTransfer.setData('image-name', img.name) }}
+                          onClick={() => addElement('image', { src: img.src, name: img.name })}
+                          className="aspect-square bg-gray-700 rounded overflow-hidden cursor-pointer hover:ring-2 ring-blue-500" title={img.name}>
+                          <img src={img.src} alt="" className="w-full h-full object-cover" />
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-gray-600 text-center py-4 text-[10px]">Görsel yükleyin veya sürükleyin</p>
+                  )}
+                </div>
               )}
             </div>
 
             {/* Background URL */}
             {templateMode === 'visual' && (
               <div className="border-t border-gray-700 p-2">
-                <div className="text-gray-500 mb-1 font-semibold">ARKA PLAN</div>
+                <div className="text-gray-500 mb-1 font-semibold text-[10px]">ARKA PLAN URL</div>
                 <input type="text" value={backgroundUrl} onChange={(e) => setBackgroundUrl(e.target.value)}
-                  className="w-full px-2 py-1 bg-[#1a1a2e] rounded border border-gray-700 text-xs" placeholder="URL..." />
+                  className="w-full px-2 py-1 bg-[#1a1a2e] rounded border border-gray-700 text-[10px]" placeholder="https://..." />
               </div>
             )}
           </div>
