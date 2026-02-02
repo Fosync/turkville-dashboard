@@ -469,15 +469,16 @@ ${selectedNews.content_snippet ? `Detay: ${selectedNews.content_snippet}` : ''}
   }
 
   // Kendi template render sistemimiz
-  const renderTemplate = async (backgroundUrl, title) => {
+  const renderTemplate = async (backgroundUrl, title, category = 'DIGER') => {
     console.log('=== TEMPLATE RENDER ===')
     console.log('Background:', backgroundUrl)
     console.log('Title:', title)
+    console.log('Category:', category)
 
     const response = await fetch('/api/render-template', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ backgroundUrl, title })
+      body: JSON.stringify({ backgroundUrl, title, category })
     })
 
     const data = await response.json()
@@ -537,14 +538,14 @@ ${selectedNews.content_snippet ? `Detay: ${selectedNews.content_snippet}` : ''}
       // 2. Slide 1 render et (özet)
       if (slide1Text) {
         console.log('2. Slide 1 render ediliyor...')
-        const slide1Url = await renderTemplate(backgroundUrl, slide1Text)
+        const slide1Url = await renderTemplate(backgroundUrl, slide1Text, selectedNews?.category)
         setGeneratedSlide1(slide1Url)
       }
 
       // 3. Slide 2 render et (detay)
       if (slide2Text) {
         console.log('3. Slide 2 render ediliyor...')
-        const slide2Url = await renderTemplate(backgroundUrl, slide2Text)
+        const slide2Url = await renderTemplate(backgroundUrl, slide2Text, selectedNews?.category)
         setGeneratedSlide2(slide2Url)
       }
 
@@ -573,11 +574,11 @@ ${selectedNews.content_snippet ? `Detay: ${selectedNews.content_snippet}` : ''}
       const slide2Text = instagramDetailed || selectedNews?.instagram_detailed
 
       if (slide1Text) {
-        const slide1Url = await renderTemplate(backgroundUrl, slide1Text)
+        const slide1Url = await renderTemplate(backgroundUrl, slide1Text, selectedNews?.category)
         setGeneratedSlide1(slide1Url)
       }
       if (slide2Text) {
-        const slide2Url = await renderTemplate(backgroundUrl, slide2Text)
+        const slide2Url = await renderTemplate(backgroundUrl, slide2Text, selectedNews?.category)
         setGeneratedSlide2(slide2Url)
       }
     } catch (error) {
