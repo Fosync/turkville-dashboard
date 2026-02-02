@@ -11,26 +11,15 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  // n8n entegrasyonu için esnek veri yapısı
   const {
     backgroundUrl,
     title,
     mode = 'visual',
     bgColor = '#dc2626',
-    // Export options
     format = 'png',
     quality = 'high',
     scale = 1,
-    // n8n data binding
     data = {},
-    // Opsiyonel element override
-    elements = null,
-    // Gradient options
-    gradientStart = 'rgba(0,0,0,0.9)',
-    gradientEnd = 'rgba(0,0,0,0)',
-    gradientDirection = 'to top',
-    gradientOpacity = 85,
-    // Category for badge
     category = 'DIGER'
   } = req.body
 
@@ -48,6 +37,7 @@ export default async function handler(req, res) {
   const finalBackground = data.backgroundUrl || backgroundUrl
   const finalMode = data.mode || mode
   const finalBgColor = data.bgColor || bgColor
+  const finalCategory = data.category || category
 
   if (!finalBackground && finalMode === 'visual') {
     return res.status(400).json({ error: 'backgroundUrl is required for visual mode' })
@@ -55,23 +45,17 @@ export default async function handler(req, res) {
 
   console.log('=== RENDER TEMPLATE START ===')
   console.log('Mode:', finalMode)
-  console.log('Background:', finalBackground?.substring(0, 100))
+  console.log('Category:', finalCategory)
   console.log('Title:', finalTitle)
-  console.log('Data:', JSON.stringify(data))
 
   try {
-    // Arka plan görselini base64'e çevir (visual mode)
+    // Arka plan görselini base64'e çevir
     let backgroundBase64 = ''
 
     if (finalMode === 'visual' && finalBackground) {
       if (finalBackground.startsWith('data:')) {
-        console.log('Background is already base64')
         backgroundBase64 = finalBackground
-      } else if (finalBackground.startsWith('#')) {
-        // Renk kodu - solid color
-        backgroundBase64 = ''
-      } else {
-        console.log('Fetching background from URL...')
+      } else if (!finalBackground.startsWith('#')) {
         try {
           const https = await import('https')
           const http = await import('http')
@@ -84,7 +68,6 @@ export default async function handler(req, res) {
                 headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
               }, (response) => {
                 if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
-                  console.log('Redirecting to:', response.headers.location)
                   let redirectUrl = response.headers.location
                   if (!redirectUrl.startsWith('http')) {
                     const urlObj = new URL(url)
@@ -93,7 +76,6 @@ export default async function handler(req, res) {
                   fetchImage(redirectUrl, maxRedirects - 1).then(resolve).catch(reject)
                   return
                 }
-
                 const chunks = []
                 response.on('data', chunk => chunks.push(chunk))
                 response.on('end', () => {
@@ -107,28 +89,18 @@ export default async function handler(req, res) {
           }
 
           const { buffer, contentType } = await fetchImage(finalBackground)
-          const base64 = buffer.toString('base64')
-          backgroundBase64 = `data:${contentType};base64,${base64}`
-          console.log('Background fetched successfully! Size:', base64.length)
+          backgroundBase64 = `data:${contentType};base64,${buffer.toString('base64')}`
         } catch (fetchError) {
           console.error('Fetch error:', fetchError.message)
-          backgroundBase64 = ''
         }
       }
     }
 
-    // Local asset dosyalarını base64'e çevir
+    // Asset dosyalarını yükle
     const publicDir = path.join(process.cwd(), 'public')
 
-    const gradientPath = path.join(publicDir, 'images', 'backgroundlinear.png')
-    const gradientBase64 = fs.existsSync(gradientPath)
-      ? `data:image/png;base64,${fs.readFileSync(gradientPath).toString('base64')}`
-      : ''
-
-    // Kategoriye göre badge dosyasını DB'den al
-    const finalCategory = data.category || category
-    let badgePath = path.join(publicDir, 'images', 'turkvillelogo.png') // fallback
-
+    // Badge - Supabase'den kategori badge_path al
+    let badgePath = path.join(publicDir, 'images', 'turkvillelogo.png')
     try {
       const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
       const { data: categoryData } = await supabase
@@ -138,134 +110,169 @@ export default async function handler(req, res) {
         .single()
 
       if (categoryData?.badge_path) {
-        // badge_path: /images/xxx.png -> public/images/xxx.png
         const relativePath = categoryData.badge_path.replace(/^\//, '')
-        badgePath = path.join(publicDir, '..', relativePath)
+        const dbBadgePath = path.join(publicDir, '..', relativePath)
+        if (fs.existsSync(dbBadgePath)) {
+          badgePath = dbBadgePath
+        }
       }
     } catch (dbError) {
-      console.log('Category DB lookup failed, using fallback:', dbError.message)
+      console.log('Category DB lookup failed:', dbError.message)
     }
 
     const badgeBase64 = fs.existsSync(badgePath)
       ? `data:image/png;base64,${fs.readFileSync(badgePath).toString('base64')}`
       : ''
 
+    // Banner
     const bannerPath = path.join(publicDir, 'images', 'banner.png')
     const bannerBase64 = fs.existsSync(bannerPath)
       ? `data:image/png;base64,${fs.readFileSync(bannerPath).toString('base64')}`
       : ''
 
-    console.log('Assets loaded - Gradient:', !!gradientBase64, 'Badge:', !!badgeBase64, 'Banner:', !!bannerBase64)
+    // Font - lokal Montserrat veya CDN Gilroy
+    const fontPath = path.join(publicDir, 'fonts', 'Montserrat-ExtraBold.ttf')
+    const hasLocalFont = fs.existsSync(fontPath)
+    const localFontBase64 = hasLocalFont
+      ? `data:font/ttf;base64,${fs.readFileSync(fontPath).toString('base64')}`
+      : ''
 
-    // Font: Gilroy CDN
-    const fontCSS = `
-      @font-face {
-        font-family: 'Gilroy';
-        src: url('https://fonts.cdnfonts.com/s/16219/Gilroy-Regular.woff') format('woff');
-        font-weight: 400;
-      }
-      @font-face {
-        font-family: 'Gilroy';
-        src: url('https://fonts.cdnfonts.com/s/16219/Gilroy-Bold.woff') format('woff');
-        font-weight: 700;
-      }
-      @font-face {
-        font-family: 'Gilroy';
-        src: url('https://fonts.cdnfonts.com/s/16219/Gilroy-ExtraBold.woff') format('woff');
-        font-weight: 800;
-      }
-    `
+    console.log('Assets - Badge:', !!badgeBase64, 'Banner:', !!bannerBase64, 'LocalFont:', hasLocalFont)
 
-    // Auto-resize için JavaScript
-    const autoResizeScript = `
-      <script>
-        function autoResizeText(element, minFontSize = 28, maxLines = 4) {
-          const container = element.parentElement;
-          const maxHeight = container.clientHeight;
-          let fontSize = parseInt(getComputedStyle(element).fontSize);
-
-          while (element.scrollHeight > maxHeight && fontSize > minFontSize) {
-            fontSize -= 2;
-            element.style.fontSize = fontSize + 'px';
-          }
-
-          // Clamp to max lines
-          const lineHeight = parseFloat(getComputedStyle(element).lineHeight);
-          const maxTextHeight = lineHeight * maxLines;
-          if (element.scrollHeight > maxTextHeight) {
-            element.style.overflow = 'hidden';
-            element.style.display = '-webkit-box';
-            element.style.webkitLineClamp = maxLines.toString();
-            element.style.webkitBoxOrient = 'vertical';
-          }
-        }
-
-        document.addEventListener('DOMContentLoaded', () => {
-          const title = document.querySelector('.title');
-          if (title) autoResizeText(title, 32, 4);
-        });
-      </script>
-    `
-
-    // HTML Template
+    // ============================================================
+    // FIGMA ÖLÇÜLERI İLE HTML TEMPLATE
+    // Frame: 1080 x 1350 px
+    // ============================================================
     const html = finalMode === 'visual' ? `
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
   <style>
-    ${fontCSS}
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap');
+    ${hasLocalFont ? `
+    @font-face {
+      font-family: 'Gilroy';
+      src: url('${localFontBase64}') format('truetype');
+      font-weight: 800;
+      font-style: normal;
+    }
+    ` : `
+    @font-face {
+      font-family: 'Gilroy';
+      src: url('https://fonts.cdnfonts.com/s/16219/Gilroy-ExtraBold.woff') format('woff');
+      font-weight: 800;
+    }
+    `}
+    @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@800&display=swap');
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { width: 1080px; height: 1350px; font-family: 'Gilroy', 'Inter', sans-serif; overflow: hidden; }
+    html, body {
+      width: 1080px;
+      height: 1350px;
+      font-family: 'Gilroy', 'Montserrat', sans-serif;
+      overflow: hidden;
+    }
 
-    .container { width: 1080px; height: 1350px; position: relative; background: #000; }
+    .container {
+      width: 1080px;
+      height: 1350px;
+      position: relative;
+      background: #000;
+    }
 
+    /* 1. ARKA PLAN - Tam ekran */
     .background {
-      position: absolute; top: 0; left: 0; width: 1080px; height: 1350px;
-      object-fit: cover; z-index: 1;
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 1080px;
+      height: 1350px;
+      object-fit: cover;
+      z-index: 1;
     }
 
+    /* 2. GRADIENT OVERLAY - Alttan yukarı (Figma: y:600 - y:1350) */
     .gradient-overlay {
-      position: absolute; top: 0; left: 0; width: 1080px; height: 1350px;
-      z-index: 2; opacity: ${gradientOpacity / 100};
-      background: linear-gradient(${gradientDirection}, ${gradientStart}, ${gradientEnd});
+      position: absolute;
+      top: 600px;
+      left: 0;
+      width: 1080px;
+      height: 750px;
+      z-index: 2;
+      background: linear-gradient(to top,
+        rgba(0, 0, 0, 0.95) 0%,
+        rgba(0, 0, 0, 0.6) 70%,
+        rgba(0, 0, 0, 0) 100%
+      );
     }
 
-    .event-badge {
-      position: absolute; top: 30px; left: 30px; width: 180px; height: auto;
-      z-index: 10; background: transparent !important;
+    /* 3. BADGE - Figma: X:61, Y:120, W:181, H:92 */
+    .badge {
+      position: absolute;
+      top: 120px;
+      left: 61px;
+      width: 181px;
+      height: 92px;
+      z-index: 10;
+      object-fit: contain;
     }
 
+    /* 4. MANŞET ALANI - Figma: X:50, Y:771, W:992, max-H:335 */
     .title-container {
-      position: absolute; bottom: 120px; left: 30px; right: 30px;
-      max-height: 200px; z-index: 11;
+      position: absolute;
+      top: 771px;
+      left: 50px;
+      width: 992px;
+      max-height: 335px;
+      z-index: 11;
+      overflow: hidden;
     }
 
+    /* 5. MANŞET YAZISI - Figma: 64px, #FFFFEB, uppercase, shadow */
     .title {
-      font-size: 52px; font-weight: 800; color: #FFFFFF;
-      text-transform: uppercase; text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.9);
-      line-height: 1.15; word-wrap: break-word;
+      font-family: 'Gilroy', 'Montserrat', sans-serif;
+      font-size: 64px;
+      font-weight: 800;
+      color: #FFFFEB;
+      text-transform: uppercase;
+      line-height: 1.2; /* 120% = 76.8px */
+      letter-spacing: 3.2px; /* 5% of 64px */
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+      /* Drop shadow */
+      text-shadow: 2px 2px 10px rgba(0, 0, 0, 0.5);
     }
 
+    /* 6. BANNER - Figma: X:50, Y:1243, W:980, H:107 */
     .banner {
-      position: absolute; bottom: 0; left: 0; right: 0;
-      width: 100%; height: 100px; z-index: 12;
-      background: transparent !important; object-fit: contain;
+      position: absolute;
+      top: 1243px;
+      left: 50px;
+      width: 980px;
+      height: 107px;
+      z-index: 12;
+      object-fit: contain;
     }
   </style>
-  ${autoResizeScript}
 </head>
 <body>
   <div class="container">
+    <!-- Z-ORDER: 1. Background -->
     <img src="${backgroundBase64}" class="background" onerror="this.style.display='none'">
+
+    <!-- Z-ORDER: 2. Gradient -->
     <div class="gradient-overlay"></div>
-    <img src="${badgeBase64}" class="event-badge">
+
+    <!-- Z-ORDER: 3. Badge (Etiket) -->
+    ${badgeBase64 ? `<img src="${badgeBase64}" class="badge">` : ''}
+
+    <!-- Z-ORDER: 4. Title (Manşet) -->
     <div class="title-container">
       <h1 class="title">${escapeHtml(finalTitle)}</h1>
     </div>
-    <img src="${bannerBase64}" class="banner">
+
+    <!-- Z-ORDER: 5. Banner -->
+    ${bannerBase64 ? `<img src="${bannerBase64}" class="banner">` : ''}
   </div>
 </body>
 </html>
@@ -275,52 +282,96 @@ export default async function handler(req, res) {
 <head>
   <meta charset="UTF-8">
   <style>
-    ${fontCSS}
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap');
+    ${hasLocalFont ? `
+    @font-face {
+      font-family: 'Gilroy';
+      src: url('${localFontBase64}') format('truetype');
+      font-weight: 800;
+      font-style: normal;
+    }
+    ` : `
+    @font-face {
+      font-family: 'Gilroy';
+      src: url('https://fonts.cdnfonts.com/s/16219/Gilroy-ExtraBold.woff') format('woff');
+      font-weight: 800;
+    }
+    `}
+    @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@800&display=swap');
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { width: 1080px; height: 1350px; font-family: 'Gilroy', 'Inter', sans-serif; overflow: hidden; }
-
-    .container { width: 1080px; height: 1350px; position: relative; background: ${finalBgColor}; }
-
-    .event-badge {
-      position: absolute; top: 30px; left: 30px; width: 180px; height: auto;
-      z-index: 10; background: transparent !important;
+    html, body {
+      width: 1080px;
+      height: 1350px;
+      font-family: 'Gilroy', 'Montserrat', sans-serif;
+      overflow: hidden;
     }
 
+    .container {
+      width: 1080px;
+      height: 1350px;
+      position: relative;
+      background: ${finalBgColor};
+    }
+
+    /* BADGE - Figma: X:61, Y:120, W:181, H:92 */
+    .badge {
+      position: absolute;
+      top: 120px;
+      left: 61px;
+      width: 181px;
+      height: 92px;
+      z-index: 10;
+      object-fit: contain;
+    }
+
+    /* İÇERİK ALANI - Text mode için genişletilmiş */
     .content-container {
-      position: absolute; top: 150px; left: 30px; right: 30px;
-      bottom: 120px; z-index: 11;
+      position: absolute;
+      top: 250px;
+      left: 50px;
+      width: 992px;
+      max-height: 880px;
+      z-index: 11;
+      overflow: hidden;
     }
 
     .content {
-      font-size: 48px; font-weight: 700; color: #FFFFFF;
-      text-transform: uppercase; line-height: 1.3; word-wrap: break-word;
+      font-family: 'Gilroy', 'Montserrat', sans-serif;
+      font-size: 56px;
+      font-weight: 800;
+      color: #FFFFEB;
+      text-transform: uppercase;
+      line-height: 1.25;
+      letter-spacing: 2px;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
     }
 
+    /* BANNER - Figma: X:50, Y:1243, W:980, H:107 */
     .banner {
-      position: absolute; bottom: 0; left: 0; right: 0;
-      width: 100%; height: 100px; z-index: 12;
-      background: transparent !important; object-fit: contain;
+      position: absolute;
+      top: 1243px;
+      left: 50px;
+      width: 980px;
+      height: 107px;
+      z-index: 12;
+      object-fit: contain;
     }
   </style>
-  ${autoResizeScript}
 </head>
 <body>
   <div class="container">
-    <img src="${badgeBase64}" class="event-badge">
+    ${badgeBase64 ? `<img src="${badgeBase64}" class="badge">` : ''}
     <div class="content-container">
-      <div class="content title">${escapeHtml(finalTitle)}</div>
+      <div class="content">${escapeHtml(finalTitle)}</div>
     </div>
-    <img src="${bannerBase64}" class="banner">
+    ${bannerBase64 ? `<img src="${bannerBase64}" class="banner">` : ''}
   </div>
 </body>
 </html>
 `
 
     console.log('Launching Puppeteer...')
-    console.log('Export settings - Format:', format, 'Quality:', quality, 'Scale:', finalScale)
-
     const browser = await puppeteer.launch({
       headless: 'new',
       args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-web-security', '--allow-file-access-from-files']
@@ -333,23 +384,22 @@ export default async function handler(req, res) {
       deviceScaleFactor: finalScale * deviceScaleFactor
     })
 
-    console.log('Setting content...')
     await page.setContent(html, {
       waitUntil: ['load', 'networkidle0'],
       timeout: 30000
     })
 
-    // Font ve auto-resize için bekle
-    await new Promise(resolve => setTimeout(resolve, 1500))
+    // Font yüklenmesi için bekle
+    await new Promise(resolve => setTimeout(resolve, 2000))
 
-    // Auto-resize script'i çalıştır
+    // Auto-resize: Uzun başlıklar için font küçült
     await page.evaluate(() => {
-      const title = document.querySelector('.title')
+      const title = document.querySelector('.title, .content')
       if (title) {
         const container = title.parentElement
-        const maxHeight = container?.clientHeight || 300
+        const maxHeight = container?.clientHeight || 335
         let fontSize = parseInt(getComputedStyle(title).fontSize)
-        const minFontSize = 32
+        const minFontSize = 40
 
         while (title.scrollHeight > maxHeight && fontSize > minFontSize) {
           fontSize -= 2
@@ -358,13 +408,11 @@ export default async function handler(req, res) {
       }
     })
 
-    console.log('Taking screenshot...')
     const screenshotOptions = {
       encoding: 'base64',
       clip: { x: 0, y: 0, width: 1080 * finalScale, height: 1350 * finalScale }
     }
 
-    // Format ve kalite ayarları
     if (format === 'jpg' || format === 'jpeg') {
       screenshotOptions.type = 'jpeg'
       screenshotOptions.quality = jpegQuality
@@ -376,14 +424,13 @@ export default async function handler(req, res) {
     }
 
     const screenshot = await page.screenshot(screenshotOptions)
-
     await browser.close()
 
     const mimeTypes = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp' }
     const mimeType = mimeTypes[format] || 'image/png'
 
     console.log('=== RENDER SUCCESS ===')
-    console.log('Format:', format, 'Size:', 1080 * finalScale, 'x', 1350 * finalScale)
+    console.log('Output:', 1080 * finalScale, 'x', 1350 * finalScale, format)
 
     return res.status(200).json({
       success: true,
@@ -391,13 +438,13 @@ export default async function handler(req, res) {
       mimeType,
       format,
       mode: finalMode,
+      category: finalCategory,
       width: 1080 * finalScale,
       height: 1350 * finalScale
     })
 
   } catch (error) {
-    console.error('=== RENDER ERROR ===')
-    console.error(error)
+    console.error('=== RENDER ERROR ===', error)
     return res.status(500).json({ error: error.message })
   }
 }
