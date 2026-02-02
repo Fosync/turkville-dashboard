@@ -142,9 +142,12 @@ export default function TemplateEditor() {
     { id: 'whiteBg', type: 'color', name: '[BG] Çalışma Alanı', color: '#FFFFFF',
       x: 0, y: 0, width: canvasWidth, height: canvasHeight, zIndex: 0, opacity: 100, locked: false, visible: true },
     { id: 'gradient', type: 'gradient', name: '[FX] Gradient',
-      x: 0, y: 0, width: canvasWidth, height: canvasHeight, zIndex: 2, opacity: 85,
+      x: 0, y: 0, width: canvasWidth, height: canvasHeight, zIndex: 2, opacity: 100,
       locked: false, visible: true, rotation: 0,
-      gradientStart: 'rgba(0,0,0,0.9)', gradientEnd: 'rgba(0,0,0,0)', gradientDirection: 'to top' },
+      gradientStartColor: '#000000', gradientEndColor: '#000000',
+      gradientStartOpacity: 90, gradientEndOpacity: 0,
+      gradientStartPos: 0, gradientEndPos: 60,
+      gradientDirection: 'to top' },
     { id: 'badge', type: 'image', name: '[UI] Etiket', src: '/images/Turkville_haber.png',
       x: 30, y: 30, width: 180, height: 60, zIndex: 10, opacity: 100, locked: false, visible: true, rotation: 0, objectFit: 'contain' },
     { id: 'title', type: 'text', name: '[TXT] Başlık', text: 'ÖRNEK ETKİNLİK BAŞLIĞI',
@@ -1082,9 +1085,27 @@ export default function TemplateEditor() {
       return <div className="w-full h-full" style={{ backgroundColor: el.color, opacity: el.opacity / 100 }} />
     }
     if (el.type === 'gradient') {
+      // Yeni format: ayrı renk, opaklık ve pozisyon
+      const startColor = el.gradientStartColor || '#000000'
+      const endColor = el.gradientEndColor || '#000000'
+      const startOpacity = (el.gradientStartOpacity ?? 90) / 100
+      const endOpacity = (el.gradientEndOpacity ?? 0) / 100
+      const startPos = el.gradientStartPos ?? 0
+      const endPos = el.gradientEndPos ?? 100
+
+      // Hex to RGB
+      const hexToRgb = (hex) => {
+        const r = parseInt(hex.slice(1,3), 16)
+        const g = parseInt(hex.slice(3,5), 16)
+        const b = parseInt(hex.slice(5,7), 16)
+        return `${r},${g},${b}`
+      }
+
+      const gradientCss = `linear-gradient(${el.gradientDirection || 'to top'}, rgba(${hexToRgb(startColor)},${startOpacity}) ${startPos}%, rgba(${hexToRgb(endColor)},${endOpacity}) ${endPos}%)`
+
       return (
         <div className="w-full h-full pointer-events-none" style={{
-          background: `linear-gradient(${el.gradientDirection || 'to top'}, ${el.gradientStart || 'rgba(0,0,0,0.9)'}, ${el.gradientEnd || 'rgba(0,0,0,0)'})`,
+          background: gradientCss,
           opacity: el.opacity / 100
         }} />
       )
@@ -1621,8 +1642,12 @@ export default function TemplateEditor() {
                         {GRADIENT_PRESETS.map(preset => (
                           <button key={preset.name}
                             onClick={() => updateElement(selectedId, {
-                              gradientStart: preset.startColor,
-                              gradientEnd: preset.endColor,
+                              gradientStartColor: preset.startColor.includes('rgba') ? '#000000' : preset.startColor,
+                              gradientEndColor: preset.endColor.includes('rgba') ? '#000000' : preset.endColor,
+                              gradientStartOpacity: 90,
+                              gradientEndOpacity: 0,
+                              gradientStartPos: 0,
+                              gradientEndPos: 100,
                               gradientDirection: preset.direction
                             })}
                             className="px-2 py-1 rounded text-[10px] hover:ring-1 ring-white"
@@ -1645,51 +1670,83 @@ export default function TemplateEditor() {
                       </select>
                     </div>
 
-                    {/* Start Color */}
-                    <div>
-                      <label className="text-gray-400 text-[10px]">Başlangıç Rengi</label>
-                      <div className="flex gap-1 mt-1">
+                    {/* Start Color with Stop & Opacity */}
+                    <div className="bg-[#1a1a2e] rounded p-2">
+                      <label className="text-gray-400 text-[10px] font-semibold">Başlangıç Rengi</label>
+                      <div className="flex gap-1 mt-1 items-center">
                         <input type="color"
-                          value={selectedElement.gradientStart?.replace(/rgba?\([\d,.\s]+\)/, '#000000') || '#000000'}
-                          onChange={(e) => {
-                            const hex = e.target.value
-                            const r = parseInt(hex.slice(1,3), 16)
-                            const g = parseInt(hex.slice(3,5), 16)
-                            const b = parseInt(hex.slice(5,7), 16)
-                            updateElement(selectedId, { gradientStart: `rgba(${r},${g},${b},0.9)` })
-                          }}
-                          className="w-10 h-6 rounded cursor-pointer border border-gray-700" />
-                        <input type="text" value={selectedElement.gradientStart || 'rgba(0,0,0,0.9)'}
-                          onChange={(e) => updateElement(selectedId, { gradientStart: e.target.value })}
-                          className="flex-1 px-1 py-0.5 bg-[#1a1a2e] rounded border border-gray-700 text-[10px]" />
+                          value={selectedElement.gradientStartColor || '#000000'}
+                          onChange={(e) => updateElement(selectedId, { gradientStartColor: e.target.value })}
+                          className="w-8 h-6 rounded cursor-pointer border border-gray-700" />
+                        <span className="text-[9px] text-gray-500 w-12">Renk</span>
+                      </div>
+                      <div className="flex gap-2 mt-2">
+                        <div className="flex-1">
+                          <label className="text-[9px] text-gray-500">Saydamlık %</label>
+                          <div className="flex items-center gap-1">
+                            <input type="range" min="0" max="100"
+                              value={selectedElement.gradientStartOpacity ?? 90}
+                              onChange={(e) => updateElement(selectedId, { gradientStartOpacity: parseInt(e.target.value) })}
+                              className="flex-1 h-1" />
+                            <span className="text-[10px] w-8 text-right">{selectedElement.gradientStartOpacity ?? 90}%</span>
+                          </div>
+                        </div>
+                        <div className="flex-1">
+                          <label className="text-[9px] text-gray-500">Pozisyon %</label>
+                          <div className="flex items-center gap-1">
+                            <input type="range" min="0" max="100"
+                              value={selectedElement.gradientStartPos ?? 0}
+                              onChange={(e) => updateElement(selectedId, { gradientStartPos: parseInt(e.target.value) })}
+                              className="flex-1 h-1" />
+                            <span className="text-[10px] w-8 text-right">{selectedElement.gradientStartPos ?? 0}%</span>
+                          </div>
+                        </div>
                       </div>
                     </div>
 
-                    {/* End Color */}
-                    <div>
-                      <label className="text-gray-400 text-[10px]">Bitiş Rengi</label>
-                      <div className="flex gap-1 mt-1">
+                    {/* End Color with Stop & Opacity */}
+                    <div className="bg-[#1a1a2e] rounded p-2">
+                      <label className="text-gray-400 text-[10px] font-semibold">Bitiş Rengi</label>
+                      <div className="flex gap-1 mt-1 items-center">
                         <input type="color"
-                          value={selectedElement.gradientEnd?.replace(/rgba?\([\d,.\s]+\)/, '#000000') || '#000000'}
-                          onChange={(e) => {
-                            const hex = e.target.value
-                            const r = parseInt(hex.slice(1,3), 16)
-                            const g = parseInt(hex.slice(3,5), 16)
-                            const b = parseInt(hex.slice(5,7), 16)
-                            updateElement(selectedId, { gradientEnd: `rgba(${r},${g},${b},0)` })
-                          }}
-                          className="w-10 h-6 rounded cursor-pointer border border-gray-700" />
-                        <input type="text" value={selectedElement.gradientEnd || 'rgba(0,0,0,0)'}
-                          onChange={(e) => updateElement(selectedId, { gradientEnd: e.target.value })}
-                          className="flex-1 px-1 py-0.5 bg-[#1a1a2e] rounded border border-gray-700 text-[10px]" />
+                          value={selectedElement.gradientEndColor || '#000000'}
+                          onChange={(e) => updateElement(selectedId, { gradientEndColor: e.target.value })}
+                          className="w-8 h-6 rounded cursor-pointer border border-gray-700" />
+                        <span className="text-[9px] text-gray-500 w-12">Renk</span>
+                      </div>
+                      <div className="flex gap-2 mt-2">
+                        <div className="flex-1">
+                          <label className="text-[9px] text-gray-500">Saydamlık %</label>
+                          <div className="flex items-center gap-1">
+                            <input type="range" min="0" max="100"
+                              value={selectedElement.gradientEndOpacity ?? 0}
+                              onChange={(e) => updateElement(selectedId, { gradientEndOpacity: parseInt(e.target.value) })}
+                              className="flex-1 h-1" />
+                            <span className="text-[10px] w-8 text-right">{selectedElement.gradientEndOpacity ?? 0}%</span>
+                          </div>
+                        </div>
+                        <div className="flex-1">
+                          <label className="text-[9px] text-gray-500">Pozisyon %</label>
+                          <div className="flex items-center gap-1">
+                            <input type="range" min="0" max="100"
+                              value={selectedElement.gradientEndPos ?? 100}
+                              onChange={(e) => updateElement(selectedId, { gradientEndPos: parseInt(e.target.value) })}
+                              className="flex-1 h-1" />
+                            <span className="text-[10px] w-8 text-right">{selectedElement.gradientEndPos ?? 100}%</span>
+                          </div>
+                        </div>
                       </div>
                     </div>
 
                     {/* Preview */}
                     <div>
                       <label className="text-gray-400 text-[10px]">Önizleme</label>
-                      <div className="w-full h-12 rounded mt-1"
-                        style={{ background: `linear-gradient(${selectedElement.gradientDirection || 'to top'}, ${selectedElement.gradientStart || 'rgba(0,0,0,0.9)'}, ${selectedElement.gradientEnd || 'rgba(0,0,0,0)'})` }} />
+                      <div className="w-full h-16 rounded mt-1 border border-gray-700"
+                        style={{
+                          background: `linear-gradient(${selectedElement.gradientDirection || 'to top'},
+                            rgba(${parseInt((selectedElement.gradientStartColor || '#000000').slice(1,3), 16)}, ${parseInt((selectedElement.gradientStartColor || '#000000').slice(3,5), 16)}, ${parseInt((selectedElement.gradientStartColor || '#000000').slice(5,7), 16)}, ${(selectedElement.gradientStartOpacity ?? 90) / 100}) ${selectedElement.gradientStartPos ?? 0}%,
+                            rgba(${parseInt((selectedElement.gradientEndColor || '#000000').slice(1,3), 16)}, ${parseInt((selectedElement.gradientEndColor || '#000000').slice(3,5), 16)}, ${parseInt((selectedElement.gradientEndColor || '#000000').slice(5,7), 16)}, ${(selectedElement.gradientEndOpacity ?? 0) / 100}) ${selectedElement.gradientEndPos ?? 100}%)`
+                        }} />
                     </div>
                   </div>
                 )}
