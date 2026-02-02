@@ -711,6 +711,12 @@ ${selectedNews.content_snippet ? `Detay: ${selectedNews.content_snippet}` : ''}
                   📁 Kategoriler
                 </button>
                 <button
+                  onClick={() => router.push('/design-library')}
+                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center gap-2 font-medium"
+                >
+                  🎨 Tasarim Kutuphanesi
+                </button>
+                <button
                   onClick={() => setShowImageGenerator(true)}
                   className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 flex items-center gap-2 font-medium shadow-sm"
                 >

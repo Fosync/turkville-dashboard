@@ -14,8 +14,8 @@ const CATEGORY_BADGE_FILES = {
   'EKONOMI': 'Turkville_ekonomi.png',
   'GUNDEM': 'Turkville_gundem.png',
   'ETKINLIK': 'Turkville_etkinlik.png',
-  'GUVENLIK': 'Turkville_siyaset.png', // fallback
-  'HAVA': 'Turkville_haber.png', // fallback
+  'GUVENLIK': 'Turkville_siyaset.png',
+  'HAVA': 'Turkville_haber.png',
   'KARIYER': 'Turkville_kariyer.png',
   'DIGER': 'Turkville_haber.png',
   'ALISVERIS': 'Turkville_alisveris.png',
@@ -31,7 +31,7 @@ const CATEGORY_BADGE_FILES = {
   'SAGLIK': 'Turkville_saglik.png',
   'YASAM': 'Turkville_yasam.png',
   'SPOR': 'Turkville_spor.png',
-  // Eski kategori isimleri için fallback
+  // Eski isimler için fallback
   'IS_ILANI': 'Turkville_kariyer.png',
   'DENEY': 'Turkville_teknoloji.png'
 }
@@ -57,7 +57,6 @@ export default async function handler(req, res) {
     category = 'DIGER'
   } = req.body
 
-  // Quality settings
   const qualitySettings = {
     low: { deviceScaleFactor: 1, jpegQuality: 60 },
     medium: { deviceScaleFactor: 1, jpegQuality: 80 },
@@ -66,7 +65,6 @@ export default async function handler(req, res) {
   const { deviceScaleFactor, jpegQuality } = qualitySettings[quality] || qualitySettings.high
   const finalScale = Math.min(Math.max(scale, 1), 3)
 
-  // Final values (backward compatibility)
   const finalTitle = data.title || title || ''
   const finalBackground = data.backgroundUrl || backgroundUrl
   const finalMode = data.mode || mode
@@ -99,9 +97,7 @@ export default async function handler(req, res) {
             return new Promise((resolve, reject) => {
               if (maxRedirects <= 0) return reject(new Error('Too many redirects'))
               const protocol = url.startsWith('https') ? https : http
-              protocol.get(url, {
-                headers: { 'User-Agent': 'Mozilla/5.0' }
-              }, (response) => {
+              protocol.get(url, { headers: { 'User-Agent': 'Mozilla/5.0' } }, (response) => {
                 if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
                   let redirectUrl = response.headers.location
                   if (!redirectUrl.startsWith('http')) {
@@ -133,7 +129,6 @@ export default async function handler(req, res) {
     // ============================================================
     // 2. BADGE - Kategoriye göre seç
     // ============================================================
-    // Önce Supabase'den dene, yoksa hardcoded mapping kullan
     let badgeFile = getBadgeFile(finalCategory)
     try {
       const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
@@ -143,12 +138,9 @@ export default async function handler(req, res) {
         .eq('key', finalCategory)
         .single()
       if (catData?.badge_path) {
-        // /images/xxx.png -> xxx.png
         badgeFile = catData.badge_path.replace('/images/', '')
       }
-    } catch (e) {
-      // DB'den alamadık, hardcoded kullan
-    }
+    } catch (e) { /* DB'den alamadık, hardcoded kullan */ }
 
     const badgePath = path.join(publicDir, 'images', badgeFile)
     const badgeBase64 = fs.existsSync(badgePath)
@@ -157,7 +149,10 @@ export default async function handler(req, res) {
     console.log('Badge:', badgeFile, 'exists:', !!badgeBase64)
 
     // ============================================================
-    // 3. GRADIENT OVERLAY - backgroundlinear.png
+    // 3. GRADIENT OVERLAY - backgroundlinear.png (TAM FRAME)
+    // Figma: Linear gradient, aşağıdan yukarı
+    // Stop 1: %58 → #000000 0% opacity
+    // Stop 2: %94 → #480400 100% opacity
     // ============================================================
     const gradientPath = path.join(publicDir, 'images', 'backgroundlinear.png')
     const gradientBase64 = fs.existsSync(gradientPath)
@@ -173,13 +168,16 @@ export default async function handler(req, res) {
       : ''
 
     // ============================================================
-    // 5. FONT - Lokal Montserrat veya CDN
+    // 5. FONT - Lokal Montserrat veya CDN Gilroy
     // ============================================================
     const fontPath = path.join(publicDir, 'fonts', 'Montserrat-ExtraBold.ttf')
-    const hasLocalFont = fs.existsSync(fontPath)
-    const localFontBase64 = hasLocalFont
-      ? `data:font/ttf;base64,${fs.readFileSync(fontPath).toString('base64')}`
-      : ''
+    const gilroyPath = path.join(publicDir, 'fonts', 'Gilroy-ExtraBold.ttf')
+    const hasLocalFont = fs.existsSync(fontPath) || fs.existsSync(gilroyPath)
+    const localFontBase64 = fs.existsSync(gilroyPath)
+      ? `data:font/ttf;base64,${fs.readFileSync(gilroyPath).toString('base64')}`
+      : fs.existsSync(fontPath)
+        ? `data:font/ttf;base64,${fs.readFileSync(fontPath).toString('base64')}`
+        : ''
 
     console.log('Assets - Badge:', !!badgeBase64, 'Gradient:', !!gradientBase64, 'Banner:', !!bannerBase64, 'Font:', hasLocalFont)
 
@@ -194,7 +192,7 @@ export default async function handler(req, res) {
   <meta charset="UTF-8">
   <style>
     /* FONT TANIMLARI */
-    ${hasLocalFont ? `
+    ${localFontBase64 ? `
     @font-face {
       font-family: 'Headline';
       src: url('${localFontBase64}') format('truetype');
@@ -211,12 +209,7 @@ export default async function handler(req, res) {
     @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@800&display=swap');
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
-
-    html, body {
-      width: 1080px;
-      height: 1350px;
-      overflow: hidden;
-    }
+    html, body { width: 1080px; height: 1350px; overflow: hidden; }
 
     .container {
       width: 1080px;
@@ -230,72 +223,54 @@ export default async function handler(req, res) {
        ============================================================ */
     .background {
       position: absolute;
-      top: 0;
-      left: 0;
-      width: 1080px;
-      height: 1350px;
+      top: 0; left: 0;
+      width: 1080px; height: 1350px;
       object-fit: cover;
       z-index: 1;
     }
 
     /* ============================================================
        Z-ORDER 2: GRADIENT OVERLAY - backgroundlinear.png
-       Alttan yukarı, kırmızımsı-siyah gradient
-       Y: 500'den başlayıp 1350'ye kadar (850px yükseklik)
+       Figma: TAM FRAME (0,0 - 1080x1350)
+       Gradient: Alttan yukarı, #480400 → transparent
        ============================================================ */
-    .gradient-png {
+    .gradient-overlay {
       position: absolute;
-      bottom: 0;
-      left: 0;
-      width: 1080px;
-      height: 850px;
-      object-fit: cover;
+      top: 0; left: 0;
+      width: 1080px; height: 1350px;
       z-index: 2;
+      object-fit: cover;
     }
 
     /* Fallback: Programatik gradient (PNG yoksa) */
     .gradient-fallback {
       position: absolute;
-      bottom: 0;
-      left: 0;
-      width: 1080px;
-      height: 850px;
+      top: 0; left: 0;
+      width: 1080px; height: 1350px;
       z-index: 2;
       background: linear-gradient(to top,
-        rgba(0, 0, 0, 0.95) 0%,
-        rgba(40, 0, 0, 0.7) 40%,
-        rgba(0, 0, 0, 0.3) 70%,
-        rgba(0, 0, 0, 0) 100%
+        rgba(72, 4, 0, 1) 0%,
+        rgba(72, 4, 0, 0.7) 20%,
+        rgba(72, 4, 0, 0.4) 40%,
+        rgba(0, 0, 0, 0.2) 58%,
+        rgba(0, 0, 0, 0) 70%
       );
     }
 
     /* ============================================================
-       Z-ORDER 3: BADGE (ETİKET)
-       Figma: X=61, Y=120, W=181, H=92
-       ============================================================ */
-    .badge {
-      position: absolute;
-      top: 120px;
-      left: 61px;
-      width: 181px;
-      height: 92px;
-      z-index: 10;
-      object-fit: contain;
-    }
-
-    /* ============================================================
-       Z-ORDER 4: MANŞET YAZISI
-       Figma: X=50, W=980 (1080-50-50), font 64px
-       Y pozisyonu: Banner'ın 45px üstünde bitecek şekilde
-       Banner Y=1243, yazı bitiş Y = 1243-45 = 1198
+       Z-ORDER 3: MANŞET YAZISI
+       Figma: X=50, W=980, Font=64px, Color=#FFFFEB
+       Line-height: 120% = 77px
+       Letter-spacing: 5%
+       Bottom margin from banner: 45px
        ============================================================ */
     .title-container {
       position: absolute;
       left: 50px;
       right: 50px;
       bottom: 152px; /* 107 (banner) + 45 (margin) = 152 */
-      max-height: 400px;
-      z-index: 11;
+      max-height: 450px;
+      z-index: 3;
       overflow: hidden;
       display: flex;
       flex-direction: column;
@@ -308,7 +283,7 @@ export default async function handler(req, res) {
       font-weight: 800;
       color: #FFFFEB;
       text-transform: uppercase;
-      line-height: 1.2; /* 120% = 76.8px */
+      line-height: 1.2; /* 120% = 77px */
       letter-spacing: 3.2px; /* 5% of 64px */
       word-wrap: break-word;
       overflow-wrap: break-word;
@@ -317,9 +292,22 @@ export default async function handler(req, res) {
     }
 
     /* ============================================================
+       Z-ORDER 4: BADGE (ETİKET)
+       Figma: X=61, Y=120, W=181, H=92
+       ============================================================ */
+    .badge {
+      position: absolute;
+      top: 120px;
+      left: 61px;
+      width: 181px;
+      height: 92px;
+      z-index: 4;
+      object-fit: contain;
+    }
+
+    /* ============================================================
        Z-ORDER 5: BANNER
-       Figma: X=50, Y=1243, W=980, H=107
-       (1350 - 107 = 1243)
+       Figma: X=50, Y=1243 (bottom=0), W=980, H=107
        ============================================================ */
     .banner {
       position: absolute;
@@ -327,31 +315,31 @@ export default async function handler(req, res) {
       left: 50px;
       width: 980px;
       height: 107px;
-      z-index: 12;
+      z-index: 5;
       object-fit: contain;
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <!-- 1. Arka Plan -->
+    <!-- Z-ORDER 1: Arka Plan -->
     <img src="${backgroundBase64}" class="background" onerror="this.style.display='none'">
 
-    <!-- 2. Gradient Overlay -->
+    <!-- Z-ORDER 2: Gradient Overlay -->
     ${gradientBase64
-      ? `<img src="${gradientBase64}" class="gradient-png">`
+      ? `<img src="${gradientBase64}" class="gradient-overlay">`
       : `<div class="gradient-fallback"></div>`
     }
 
-    <!-- 3. Badge (Kategori Etiketi) -->
-    ${badgeBase64 ? `<img src="${badgeBase64}" class="badge">` : ''}
-
-    <!-- 4. Manşet Yazısı -->
+    <!-- Z-ORDER 3: Manşet Yazısı -->
     <div class="title-container">
       <h1 class="title">${escapeHtml(finalTitle)}</h1>
     </div>
 
-    <!-- 5. Banner -->
+    <!-- Z-ORDER 4: Badge (Kategori Etiketi) -->
+    ${badgeBase64 ? `<img src="${badgeBase64}" class="badge">` : ''}
+
+    <!-- Z-ORDER 5: Banner -->
     ${bannerBase64 ? `<img src="${bannerBase64}" class="banner">` : ''}
   </div>
 </body>
@@ -362,7 +350,7 @@ export default async function handler(req, res) {
 <head>
   <meta charset="UTF-8">
   <style>
-    ${hasLocalFont ? `
+    ${localFontBase64 ? `
     @font-face {
       font-family: 'Headline';
       src: url('${localFontBase64}') format('truetype');
@@ -381,27 +369,22 @@ export default async function handler(req, res) {
     html, body { width: 1080px; height: 1350px; overflow: hidden; }
 
     .container {
-      width: 1080px;
-      height: 1350px;
+      width: 1080px; height: 1350px;
       position: relative;
       background: ${finalBgColor};
     }
 
     .badge {
       position: absolute;
-      top: 120px;
-      left: 61px;
-      width: 181px;
-      height: 92px;
+      top: 120px; left: 61px;
+      width: 181px; height: 92px;
       z-index: 10;
       object-fit: contain;
     }
 
     .content-container {
       position: absolute;
-      top: 250px;
-      left: 50px;
-      right: 50px;
+      top: 250px; left: 50px; right: 50px;
       bottom: 152px;
       z-index: 11;
       overflow: hidden;
@@ -420,10 +403,8 @@ export default async function handler(req, res) {
 
     .banner {
       position: absolute;
-      bottom: 0;
-      left: 50px;
-      width: 980px;
-      height: 107px;
+      bottom: 0; left: 50px;
+      width: 980px; height: 107px;
       z-index: 12;
       object-fit: contain;
     }
@@ -444,7 +425,6 @@ export default async function handler(req, res) {
     // ============================================================
     // PUPPETEER İLE RENDER
     // ============================================================
-    console.log('Launching Puppeteer...')
     const browser = await puppeteer.launch({
       headless: 'new',
       args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-web-security']
@@ -471,11 +451,8 @@ export default async function handler(req, res) {
       if (title) {
         const container = title.parentElement
         if (!container) return
-
         let fontSize = parseInt(getComputedStyle(title).fontSize)
         const minFontSize = 36
-
-        // Container'a sığana kadar küçült
         while (title.scrollHeight > container.clientHeight && fontSize > minFontSize) {
           fontSize -= 2
           title.style.fontSize = fontSize + 'px'
@@ -501,15 +478,13 @@ export default async function handler(req, res) {
     const screenshot = await page.screenshot(screenshotOptions)
     await browser.close()
 
-    const mimeTypes = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp' }
-
     console.log('=== RENDER SUCCESS ===')
     console.log('Output:', 1080 * finalScale, 'x', 1350 * finalScale, format, 'Category:', finalCategory)
 
     return res.status(200).json({
       success: true,
       base64: screenshot,
-      mimeType: mimeTypes[format] || 'image/png',
+      mimeType: { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp' }[format] || 'image/png',
       format,
       mode: finalMode,
       category: finalCategory,
@@ -525,12 +500,9 @@ export default async function handler(req, res) {
 
 function escapeHtml(text) {
   if (!text) return ''
-  const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }
-  return text.replace(/[&<>"']/g, m => map[m])
+  return text.replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[m])
 }
 
 export const config = {
-  api: {
-    bodyParser: { sizeLimit: '10mb' }
-  }
+  api: { bodyParser: { sizeLimit: '10mb' } }
 }
