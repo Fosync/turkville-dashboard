@@ -646,25 +646,277 @@ export default function TemplateEditor() {
     }
   }
 
+  // SVG Parser - SVG'yi katmanlara ayır
+  const parseSvgToLayers = (svgContent, fileName) => {
+    try {
+      const parser = new DOMParser()
+      const doc = parser.parseFromString(svgContent, 'image/svg+xml')
+      const svg = doc.querySelector('svg')
+      if (!svg) return null
+
+      // SVG viewBox veya width/height al
+      const viewBox = svg.getAttribute('viewBox')?.split(' ').map(Number) || [0, 0, 1080, 1350]
+      const svgWidth = parseFloat(svg.getAttribute('width')) || viewBox[2] || 1080
+      const svgHeight = parseFloat(svg.getAttribute('height')) || viewBox[3] || 1350
+
+      // Scale factor - canvas boyutuna göre
+      const scaleX = canvasWidth / svgWidth
+      const scaleY = canvasHeight / svgHeight
+      const scaleFactor = Math.min(scaleX, scaleY, 1)
+
+      const newElements = []
+      let layerIndex = 0
+
+      // Tüm görünür elementleri bul
+      const processElement = (el, parentTransform = '') => {
+        const tagName = el.tagName?.toLowerCase()
+        if (!tagName) return
+
+        // Gizli elementleri atla
+        const display = el.getAttribute('display')
+        const visibility = el.getAttribute('visibility')
+        if (display === 'none' || visibility === 'hidden') return
+
+        // Transform al
+        const transform = el.getAttribute('transform') || ''
+        const fullTransform = parentTransform + ' ' + transform
+
+        // Group ise çocukları işle
+        if (tagName === 'g') {
+          Array.from(el.children).forEach(child => processElement(child, fullTransform))
+          return
+        }
+
+        // Defs, style, script atla
+        if (['defs', 'style', 'script', 'clippath', 'mask', 'lineargradient', 'radialgradient', 'pattern'].includes(tagName)) return
+
+        const id = `svg-${Date.now()}-${layerIndex++}`
+        const elName = el.getAttribute('id') || el.getAttribute('class') || `${tagName}-${layerIndex}`
+
+        // Element tipine göre işle
+        if (tagName === 'rect') {
+          const x = (parseFloat(el.getAttribute('x')) || 0) * scaleFactor
+          const y = (parseFloat(el.getAttribute('y')) || 0) * scaleFactor
+          const width = (parseFloat(el.getAttribute('width')) || 100) * scaleFactor
+          const height = (parseFloat(el.getAttribute('height')) || 100) * scaleFactor
+          const fill = el.getAttribute('fill') || '#000000'
+          const stroke = el.getAttribute('stroke') || 'none'
+          const strokeWidth = parseFloat(el.getAttribute('stroke-width')) || 0
+          const rx = parseFloat(el.getAttribute('rx')) || 0
+
+          newElements.push({
+            id, name: `[SVG] ${elName}`, type: 'rect',
+            x, y, width, height,
+            fill: fill === 'none' ? 'transparent' : fill,
+            stroke: stroke === 'none' ? 'transparent' : stroke,
+            strokeWidth: strokeWidth * scaleFactor,
+            borderRadius: rx * scaleFactor,
+            zIndex: elements.length + layerIndex,
+            opacity: parseFloat(el.getAttribute('opacity') || el.style?.opacity || 1) * 100,
+            locked: false, visible: true, rotation: 0
+          })
+        }
+        else if (tagName === 'circle') {
+          const cx = (parseFloat(el.getAttribute('cx')) || 0) * scaleFactor
+          const cy = (parseFloat(el.getAttribute('cy')) || 0) * scaleFactor
+          const r = (parseFloat(el.getAttribute('r')) || 50) * scaleFactor
+          const fill = el.getAttribute('fill') || '#000000'
+
+          newElements.push({
+            id, name: `[SVG] ${elName}`, type: 'circle',
+            x: cx - r, y: cy - r, width: r * 2, height: r * 2,
+            fill: fill === 'none' ? 'transparent' : fill,
+            stroke: el.getAttribute('stroke') || 'transparent',
+            strokeWidth: (parseFloat(el.getAttribute('stroke-width')) || 0) * scaleFactor,
+            zIndex: elements.length + layerIndex,
+            opacity: parseFloat(el.getAttribute('opacity') || 1) * 100,
+            locked: false, visible: true, rotation: 0
+          })
+        }
+        else if (tagName === 'ellipse') {
+          const cx = (parseFloat(el.getAttribute('cx')) || 0) * scaleFactor
+          const cy = (parseFloat(el.getAttribute('cy')) || 0) * scaleFactor
+          const rx = (parseFloat(el.getAttribute('rx')) || 50) * scaleFactor
+          const ry = (parseFloat(el.getAttribute('ry')) || 50) * scaleFactor
+          const fill = el.getAttribute('fill') || '#000000'
+
+          newElements.push({
+            id, name: `[SVG] ${elName}`, type: 'circle',
+            x: cx - rx, y: cy - ry, width: rx * 2, height: ry * 2,
+            fill: fill === 'none' ? 'transparent' : fill,
+            stroke: el.getAttribute('stroke') || 'transparent',
+            strokeWidth: (parseFloat(el.getAttribute('stroke-width')) || 0) * scaleFactor,
+            zIndex: elements.length + layerIndex,
+            opacity: parseFloat(el.getAttribute('opacity') || 1) * 100,
+            locked: false, visible: true, rotation: 0
+          })
+        }
+        else if (tagName === 'text') {
+          const x = (parseFloat(el.getAttribute('x')) || 0) * scaleFactor
+          const y = (parseFloat(el.getAttribute('y')) || 0) * scaleFactor
+          const fontSize = parseFloat(el.getAttribute('font-size') || el.style?.fontSize || 16) * scaleFactor
+          const fill = el.getAttribute('fill') || '#000000'
+          const text = el.textContent || ''
+
+          newElements.push({
+            id, name: `[SVG] ${elName}`, type: 'text',
+            x, y: y - fontSize, width: text.length * fontSize * 0.6, height: fontSize * 1.5,
+            text,
+            fontSize: Math.round(fontSize),
+            fontWeight: parseInt(el.getAttribute('font-weight')) || 400,
+            fontFamily: el.getAttribute('font-family') || "'Inter', sans-serif",
+            color: fill === 'none' ? '#000000' : fill,
+            textAlign: 'left', lineHeight: 1.2, letterSpacing: 0,
+            zIndex: elements.length + layerIndex,
+            opacity: parseFloat(el.getAttribute('opacity') || 1) * 100,
+            locked: false, visible: true, rotation: 0, shadow: false
+          })
+        }
+        else if (tagName === 'line') {
+          const x1 = (parseFloat(el.getAttribute('x1')) || 0) * scaleFactor
+          const y1 = (parseFloat(el.getAttribute('y1')) || 0) * scaleFactor
+          const x2 = (parseFloat(el.getAttribute('x2')) || 100) * scaleFactor
+          const y2 = (parseFloat(el.getAttribute('y2')) || 0) * scaleFactor
+          const stroke = el.getAttribute('stroke') || '#000000'
+
+          newElements.push({
+            id, name: `[SVG] ${elName}`, type: 'line',
+            x: Math.min(x1, x2), y: Math.min(y1, y2),
+            width: Math.abs(x2 - x1) || 100, height: Math.abs(y2 - y1) || 4,
+            fill: stroke,
+            strokeWidth: (parseFloat(el.getAttribute('stroke-width')) || 2) * scaleFactor,
+            zIndex: elements.length + layerIndex,
+            opacity: parseFloat(el.getAttribute('opacity') || 1) * 100,
+            locked: false, visible: true, rotation: 0
+          })
+        }
+        else if (tagName === 'image') {
+          const x = (parseFloat(el.getAttribute('x')) || 0) * scaleFactor
+          const y = (parseFloat(el.getAttribute('y')) || 0) * scaleFactor
+          const width = (parseFloat(el.getAttribute('width')) || 100) * scaleFactor
+          const height = (parseFloat(el.getAttribute('height')) || 100) * scaleFactor
+          const href = el.getAttribute('href') || el.getAttribute('xlink:href') || ''
+
+          newElements.push({
+            id, name: `[SVG] ${elName}`, type: 'image',
+            x, y, width, height,
+            src: href,
+            objectFit: 'contain',
+            zIndex: elements.length + layerIndex,
+            opacity: parseFloat(el.getAttribute('opacity') || 1) * 100,
+            locked: false, visible: true, rotation: 0
+          })
+        }
+        else if (['path', 'polygon', 'polyline'].includes(tagName)) {
+          // Path/Polygon/Polyline - SVG olarak embed et
+          const bbox = el.getBBox ? el.getBBox() : { x: 0, y: 0, width: 100, height: 100 }
+          const serializer = new XMLSerializer()
+
+          // Element'i ayrı bir SVG olarak wrap et
+          const wrapperSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+          wrapperSvg.setAttribute('viewBox', `${bbox.x} ${bbox.y} ${bbox.width} ${bbox.height}`)
+          wrapperSvg.setAttribute('width', bbox.width)
+          wrapperSvg.setAttribute('height', bbox.height)
+          const clonedEl = el.cloneNode(true)
+          wrapperSvg.appendChild(clonedEl)
+
+          const svgString = serializer.serializeToString(wrapperSvg)
+          const svgBase64 = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgString)))
+
+          newElements.push({
+            id, name: `[SVG] ${elName}`, type: 'image',
+            x: bbox.x * scaleFactor, y: bbox.y * scaleFactor,
+            width: bbox.width * scaleFactor, height: bbox.height * scaleFactor,
+            src: svgBase64,
+            objectFit: 'contain',
+            zIndex: elements.length + layerIndex,
+            opacity: parseFloat(el.getAttribute('opacity') || 1) * 100,
+            locked: false, visible: true, rotation: 0
+          })
+        }
+      }
+
+      // SVG'nin tüm çocuklarını işle
+      Array.from(svg.children).forEach(child => processElement(child))
+
+      return newElements.length > 0 ? newElements : null
+    } catch (error) {
+      console.error('SVG parse error:', error)
+      return null
+    }
+  }
+
+  // SVG Import Modal state
+  const [svgImportModal, setSvgImportModal] = useState({ show: false, content: '', fileName: '', dataUrl: '' })
+
   // File upload - PNG, JPEG, SVG, PDF destekli
   const handleFileUpload = (e) => {
     Array.from(e.target.files || []).forEach(file => {
       const validTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/svg+xml', 'image/webp', 'image/gif', 'application/pdf']
       if (!validTypes.includes(file.type) && !file.type.startsWith('image/')) return
 
+      const fileExt = file.name.split('.').pop().toLowerCase()
+
+      // SVG ise özel işlem - katmanlara ayırma seçeneği sun
+      if (file.type === 'image/svg+xml' || fileExt === 'svg') {
+        const textReader = new FileReader()
+        textReader.onload = (ev) => {
+          const dataReader = new FileReader()
+          dataReader.onload = (ev2) => {
+            setSvgImportModal({
+              show: true,
+              content: ev.target.result,
+              fileName: file.name.replace(/\.[^/.]+$/, ''),
+              dataUrl: ev2.target.result
+            })
+          }
+          dataReader.readAsDataURL(file)
+        }
+        textReader.readAsText(file)
+        return
+      }
+
+      // Diğer formatlar normal işlem
       const reader = new FileReader()
       reader.onload = (ev) => {
-        const fileExt = file.name.split('.').pop().toLowerCase()
         setUploadedImages(prev => [...prev, {
           id: Date.now(),
           name: file.name.replace(/\.[^/.]+$/, ''),
           src: ev.target.result,
-          type: fileExt // svg, png, jpg, pdf
+          type: fileExt
         }])
       }
       reader.readAsDataURL(file)
     })
     if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  // SVG'yi katmanlara ayırarak import et
+  const importSvgAsLayers = () => {
+    const layers = parseSvgToLayers(svgImportModal.content, svgImportModal.fileName)
+    if (layers && layers.length > 0) {
+      setElements(prev => {
+        const newElements = [...prev, ...layers]
+        saveHistory(newElements)
+        return newElements
+      })
+      alert(`${layers.length} katman eklendi!`)
+    } else {
+      alert('SVG katmanlara ayrılamadı. Tek görsel olarak ekleniyor.')
+      importSvgAsSingleImage()
+    }
+    setSvgImportModal({ show: false, content: '', fileName: '', dataUrl: '' })
+  }
+
+  // SVG'yi tek görsel olarak import et
+  const importSvgAsSingleImage = () => {
+    setUploadedImages(prev => [...prev, {
+      id: Date.now(),
+      name: svgImportModal.fileName,
+      src: svgImportModal.dataUrl,
+      type: 'svg'
+    }])
+    setSvgImportModal({ show: false, content: '', fileName: '', dataUrl: '' })
   }
 
   // Canvas drop
@@ -1724,6 +1976,59 @@ export default function TemplateEditor() {
                   ) : '📥 İndir'}
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* SVG Import Modal */}
+        {svgImportModal.show && (
+          <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={() => setSvgImportModal({ show: false, content: '', fileName: '', dataUrl: '' })}>
+            <div className="bg-[#16213e] rounded-xl p-4 w-96 shadow-2xl" onClick={e => e.stopPropagation()}>
+              <h2 className="text-base font-bold mb-3">📐 SVG Import Seçenekleri</h2>
+
+              <div className="mb-4">
+                <div className="bg-[#1a1a2e] rounded-lg p-3 mb-3">
+                  <p className="text-sm text-gray-300 mb-1">Dosya: <span className="text-white font-medium">{svgImportModal.fileName}.svg</span></p>
+                  <div className="w-full h-32 bg-gray-800 rounded flex items-center justify-center overflow-hidden">
+                    <img src={svgImportModal.dataUrl} alt="SVG Preview" className="max-w-full max-h-full object-contain" />
+                  </div>
+                </div>
+
+                <p className="text-xs text-gray-400 mb-3">
+                  SVG dosyasını nasıl import etmek istersiniz?
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <button
+                  onClick={importSvgAsLayers}
+                  className="w-full py-3 bg-gradient-to-r from-purple-600 to-pink-600 rounded-lg text-sm font-medium hover:from-purple-500 hover:to-pink-500 flex items-center justify-center gap-2"
+                >
+                  <span>📑</span>
+                  <span>Katmanlara Ayır</span>
+                </button>
+                <p className="text-[10px] text-gray-500 text-center mb-2">
+                  Her SVG elementi (rect, circle, path, text) ayrı bir katman olur
+                </p>
+
+                <button
+                  onClick={importSvgAsSingleImage}
+                  className="w-full py-3 bg-gray-700 rounded-lg text-sm font-medium hover:bg-gray-600 flex items-center justify-center gap-2"
+                >
+                  <span>🖼️</span>
+                  <span>Tek Görsel Olarak Ekle</span>
+                </button>
+                <p className="text-[10px] text-gray-500 text-center">
+                  SVG'yi düzenlenemez tek bir görsel olarak ekler
+                </p>
+              </div>
+
+              <button
+                onClick={() => setSvgImportModal({ show: false, content: '', fileName: '', dataUrl: '' })}
+                className="w-full mt-4 py-2 bg-gray-800 rounded text-xs text-gray-400 hover:bg-gray-700"
+              >
+                İptal
+              </button>
             </div>
           </div>
         )}
