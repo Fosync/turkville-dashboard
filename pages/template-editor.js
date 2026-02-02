@@ -947,7 +947,7 @@ export default function TemplateEditor() {
             >
               {categoriesDB.length > 0 ? (
                 categoriesDB.map(cat => (
-                  <option key={cat.key} value={cat.key}>{cat.name_tr}</option>
+                  <option key={cat.key} value={cat.key}>{cat.label_tr || cat.key}</option>
                 ))
               ) : (
                 <option value="HABER">Haber</option>
@@ -1059,7 +1059,7 @@ export default function TemplateEditor() {
                 className="w-full px-2 py-1.5 bg-[#1a1a2e] rounded border border-gray-700 text-xs"
               >
                 {categoriesDB.map(cat => (
-                  <option key={cat.key} value={cat.key}>{cat.name_tr}</option>
+                  <option key={cat.key} value={cat.key}>{cat.label_tr || cat.key}</option>
                 ))}
               </select>
             </div>
