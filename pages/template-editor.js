@@ -124,7 +124,7 @@ export default function TemplateEditor() {
   const [templateMode, setTemplateMode] = useState('visual')
   const [bgColor, setBgColor] = useState('#dc2626')
   const [presetSize, setPresetSize] = useState('instagram-post')
-  const [backgroundUrl, setBackgroundUrl] = useState('https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=1080&h=1350&fit=crop')
+  const [backgroundUrl, setBackgroundUrl] = useState('')
 
   // Counters
   const [imageCounter, setImageCounter] = useState(1)
