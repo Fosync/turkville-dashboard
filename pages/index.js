@@ -729,6 +729,12 @@ ${selectedNews.content_snippet ? `Detay: ${selectedNews.content_snippet}` : ''}
                   📸 Post Olustur
                 </button>
                 <button
+                  onClick={() => router.push('/video-editor')}
+                  className="px-4 py-2 bg-gradient-to-r from-red-600 to-orange-600 text-white rounded-lg hover:from-red-700 hover:to-orange-700 flex items-center gap-2 font-medium shadow-sm"
+                >
+                  🎬 Video Editor
+                </button>
+                <button
                   onClick={fetchNews}
                   className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-2"
                 >
