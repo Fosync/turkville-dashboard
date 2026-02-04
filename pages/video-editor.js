@@ -587,25 +587,59 @@ export default function VideoEditor() {
     setLoadingMessage('Video yükleniyor...')
 
     try {
-      // Proxy üzerinden yükle (CORS bypass)
-      const proxyUrl = `/api/video-proxy?url=${encodeURIComponent(videoUrl)}`
+      const url = videoUrl.trim()
 
-      // Video'nun yüklenip yüklenemediğini test et
-      const testResponse = await fetch(proxyUrl, { method: 'HEAD' }).catch(() => null)
+      // Sosyal medya URL'si mi kontrol et
+      const isSocialMedia = [
+        'twitter.com', 'x.com',
+        'instagram.com',
+        'tiktok.com',
+        'youtube.com', 'youtu.be',
+        'facebook.com', 'fb.watch'
+      ].some(domain => url.includes(domain))
 
-      if (testResponse && testResponse.ok) {
-        setVideoSrc(proxyUrl)
+      let finalVideoUrl
+
+      if (isSocialMedia) {
+        // Sosyal medya URL'si - yt-dlp ile video URL'sini çıkar
+        setLoadingMessage('Video URL\'si çıkarılıyor...')
+
+        const extractResponse = await fetch(`/api/extract-video?url=${encodeURIComponent(url)}`)
+        const extractData = await extractResponse.json()
+
+        if (!extractData.success) {
+          throw new Error(extractData.error || 'Video çıkarılamadı')
+        }
+
+        // Proxy URL'sini kullan
+        finalVideoUrl = extractData.proxyUrl
+        console.log('Extracted video URL:', extractData.videoUrl)
+
       } else {
-        // Proxy başarısızsa direkt URL'i dene
-        setVideoSrc(videoUrl)
+        // Direkt video URL'si - proxy üzerinden yükle
+        const proxyUrl = `/api/video-proxy?url=${encodeURIComponent(url)}`
+
+        // Video'nun yüklenip yüklenemediğini test et
+        const testResponse = await fetch(proxyUrl, { method: 'HEAD' }).catch(() => null)
+
+        if (testResponse && testResponse.ok) {
+          finalVideoUrl = proxyUrl
+        } else {
+          // Proxy başarısızsa direkt URL'i dene
+          finalVideoUrl = url
+        }
       }
 
+      setLoadingMessage('Video yükleniyor...')
+      setVideoSrc(finalVideoUrl)
       setShowUrlModal(false)
       setVideoUrl('')
       setTrimStart(0)
       setTrimEnd(0)
       setCurrentTime(0)
+
     } catch (error) {
+      console.error('Video load error:', error)
       alert('Video yüklenemedi: ' + error.message)
     } finally {
       setIsLoading(false)
