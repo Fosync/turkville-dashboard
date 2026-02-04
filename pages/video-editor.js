@@ -367,10 +367,11 @@ export default function VideoEditor() {
     if (!video) return
 
     const handleTimeUpdate = () => {
-      setCurrentTime(video.currentTime)
+      const newTime = video.currentTime
+      setCurrentTime(newTime)
 
-      // Auto-pause at trim end
-      if (video.currentTime >= trimEnd) {
+      // Auto-pause at trim end (sadece oynatma sırasında)
+      if (!video.paused && newTime >= trimEnd) {
         video.pause()
         video.currentTime = trimStart
         setIsPlaying(false)
@@ -479,8 +480,11 @@ export default function VideoEditor() {
 
   const seekTo = (time) => {
     const video = videoRef.current
-    if (!video) return
-    video.currentTime = Math.max(trimStart, Math.min(trimEnd, time))
+    if (!video || !videoDuration) return
+    // Tüm video boyunca gezinebilsin (trim sınırlaması kaldırıldı)
+    const clampedTime = Math.max(0, Math.min(videoDuration, time))
+    video.currentTime = clampedTime
+    setCurrentTime(clampedTime)
   }
 
   const toggleMute = () => {
@@ -2195,44 +2199,53 @@ export default function VideoEditor() {
           {/* Timeline */}
           <div className="flex-1 px-4 py-2 overflow-hidden" ref={timelineRef}>
             {/* Seek Bar */}
-            <div className="relative h-6 mb-2">
+            <div
+              className="relative h-8 mb-2 cursor-pointer group"
+              onClick={(e) => {
+                if (!videoDuration) return
+                const rect = e.currentTarget.getBoundingClientRect()
+                const clickX = e.clientX - rect.left
+                const percentage = clickX / rect.width
+                const newTime = percentage * videoDuration
+                seekTo(newTime)
+              }}
+            >
               <div className="absolute inset-0 bg-[#1a1a24] rounded" />
 
               {/* Trim Region */}
               <div
-                className="absolute top-0 bottom-0 bg-red-600/20"
+                className="absolute top-0 bottom-0 bg-red-600/20 border-l border-r border-red-500/50"
                 style={{
                   left: `${(trimStart / (videoDuration || 1)) * 100}%`,
                   width: `${((trimEnd - trimStart) / (videoDuration || 1)) * 100}%`,
                 }}
               />
 
-              {/* Progress */}
+              {/* Progress (dolgu) */}
               <div
-                className="absolute top-0 bottom-0 bg-red-600/40 rounded-l"
+                className="absolute top-0 bottom-0 bg-red-600/30 rounded-l transition-all duration-75"
                 style={{
                   width: `${(currentTime / (videoDuration || 1)) * 100}%`,
                 }}
               />
 
-              {/* Current Position */}
+              {/* Current Position Indicator (çizgi) */}
               <div
-                className="absolute top-0 bottom-0 w-0.5 bg-red-500"
+                className="absolute top-0 bottom-0 w-1 bg-red-500 rounded shadow-lg transition-all duration-75"
                 style={{
-                  left: `${(currentTime / (videoDuration || 1)) * 100}%`,
+                  left: `calc(${(currentTime / (videoDuration || 1)) * 100}% - 2px)`,
                 }}
-              />
+              >
+                {/* Üstte yuvarlak gösterge */}
+                <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-3 h-3 bg-red-500 rounded-full shadow group-hover:scale-125 transition-transform" />
+              </div>
 
-              {/* Click to Seek */}
-              <input
-                type="range"
-                min="0"
-                max={videoDuration || 1}
-                step="0.1"
-                value={currentTime}
-                onChange={(e) => seekTo(parseFloat(e.target.value))}
-                className="absolute inset-0 w-full opacity-0 cursor-pointer"
-              />
+              {/* Time markers */}
+              <div className="absolute bottom-0 left-0 right-0 flex justify-between px-1 text-[10px] text-gray-500 pointer-events-none">
+                <span>0:00</span>
+                <span>{formatTime(videoDuration / 2)}</span>
+                <span>{formatTime(videoDuration)}</span>
+              </div>
             </div>
 
             {/* Trim Controls */}
