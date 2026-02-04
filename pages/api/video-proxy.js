@@ -2,7 +2,8 @@
 // NOT: Bu basit bir proxy. Gerçek uygulamada yt-dlp veya benzeri araçlar gerekebilir.
 
 export default async function handler(req, res) {
-  if (req.method !== 'GET') {
+  // HEAD ve GET destekle
+  if (req.method !== 'GET' && req.method !== 'HEAD') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
@@ -40,7 +41,31 @@ export default async function handler(req, res) {
       console.log('Host not in allowlist, trying anyway:', urlObj.hostname)
     }
 
-    // Video'yu fetch et
+    // HEAD request için sadece header kontrolü yap
+    if (req.method === 'HEAD') {
+      const headResponse = await fetch(videoUrl, {
+        method: 'HEAD',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        },
+      })
+
+      if (!headResponse.ok) {
+        return res.status(headResponse.status).end()
+      }
+
+      const contentType = headResponse.headers.get('content-type') || 'video/mp4'
+      const contentLength = headResponse.headers.get('content-length')
+
+      res.setHeader('Content-Type', contentType)
+      res.setHeader('Access-Control-Allow-Origin', '*')
+      if (contentLength) {
+        res.setHeader('Content-Length', contentLength)
+      }
+      return res.status(200).end()
+    }
+
+    // GET request - Video'yu fetch et ve stream et
     const response = await fetch(videoUrl, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -61,6 +86,8 @@ export default async function handler(req, res) {
     res.setHeader('Content-Type', contentType)
     res.setHeader('Access-Control-Allow-Origin', '*')
     res.setHeader('Cache-Control', 'public, max-age=3600')
+    // Video seeking için gerekli
+    res.setHeader('Accept-Ranges', 'bytes')
 
     // Content-Length varsa ekle
     const contentLength = response.headers.get('content-length')
