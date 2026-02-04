@@ -379,8 +379,34 @@ export default function VideoEditor() {
     }
 
     const handleLoadedMetadata = () => {
-      setVideoDuration(video.duration)
-      setTrimEnd(video.duration)
+      const duration = video.duration
+      if (duration && !isNaN(duration) && duration > 0) {
+        console.log('Video loaded, duration:', duration)
+        setVideoDuration(duration)
+        setTrimEnd(duration)
+      }
+    }
+
+    const handleLoadedData = () => {
+      // Bazı videolarda loadedmetadata yerine loadeddata'da duration gelir
+      const duration = video.duration
+      if (duration && !isNaN(duration) && duration > 0 && videoDuration === 0) {
+        console.log('Video data loaded, duration:', duration)
+        setVideoDuration(duration)
+        setTrimEnd(duration)
+      }
+    }
+
+    const handleDurationChange = () => {
+      // Duration değiştiğinde güncelle
+      const duration = video.duration
+      if (duration && !isNaN(duration) && duration > 0) {
+        console.log('Duration changed:', duration)
+        setVideoDuration(duration)
+        if (trimEnd === 0) {
+          setTrimEnd(duration)
+        }
+      }
     }
 
     const handleEnded = () => {
@@ -390,14 +416,26 @@ export default function VideoEditor() {
 
     video.addEventListener('timeupdate', handleTimeUpdate)
     video.addEventListener('loadedmetadata', handleLoadedMetadata)
+    video.addEventListener('loadeddata', handleLoadedData)
+    video.addEventListener('durationchange', handleDurationChange)
     video.addEventListener('ended', handleEnded)
+
+    // Video zaten yüklüyse duration'ı al
+    if (video.duration && !isNaN(video.duration) && video.duration > 0) {
+      setVideoDuration(video.duration)
+      if (trimEnd === 0) {
+        setTrimEnd(video.duration)
+      }
+    }
 
     return () => {
       video.removeEventListener('timeupdate', handleTimeUpdate)
       video.removeEventListener('loadedmetadata', handleLoadedMetadata)
+      video.removeEventListener('loadeddata', handleLoadedData)
+      video.removeEventListener('durationchange', handleDurationChange)
       video.removeEventListener('ended', handleEnded)
     }
-  }, [trimStart, trimEnd])
+  }, [trimStart, trimEnd, videoSrc])
 
   // Keyboard shortcuts
   useEffect(() => {
